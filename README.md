@@ -1,0 +1,195 @@
+# Project Expense Manager — Phase 1 (MVP)
+
+A web app for a construction / project-based company to record every expense against a
+project and an expense head, approve it, and see **how much each project has spent, and on what**.
+
+The full specification is in [`docs/`](docs/README.md) (features, database, screens, roadmap).
+
+## Features
+
+- **Projects** with optional budgets, a built-in *Head Office / General* cost center, budget bars
+  (green < 80 %, amber 80–100 %, red > 100 %) and a profile page with spend by head.
+- **Expense heads & sub-heads** (9 heads / 32 sub-heads pre-loaded), add / rename / disable.
+- **Expenses** with receipt upload (JPG/PNG/PDF, 5 MB each, photos auto-shrunk on phones), five
+  payment modes, vendor/worker picker, **split bills** across projects/heads, list with filters and
+  filtered total, Excel/PDF export.
+- **Approval**: Pending → Approved / Rejected (reason required). Approved entries are locked
+  (only Admin can edit, always logged). Optional auto-approve for Admin/Accountant entries.
+- **Vendors** and a **labour register** with labour payments (days × rate helper) and advances.
+- **Dashboard** and **5 reports** (Project Cost Summary, Expense Head, Project Ledger, Labour
+  Payments, Vendors) with Excel and PDF export (company name, address and logo on the PDF).
+- **Users & roles**: Admin, Accountant, Site In-charge (sees and enters only for assigned projects).
+- **Activity log** of every create / edit / approve / reject / delete / login with old → new values.
+- Soft delete everywhere, exact decimal money (never floats), `PKR 1,250,000`, dates `DD-MM-YYYY`.
+
+## Tech stack
+
+Next.js 16 (App Router) + TypeScript · Prisma 6 · PostgreSQL (SQLite for local dev) ·
+iron-session + bcrypt · Tailwind CSS 4 with shadcn/ui-style components · Recharts · zod ·
+exceljs · @react-pdf/renderer · Vitest.
+
+---
+
+## Quick start (local development, SQLite — no database server needed)
+
+Requirements: **Node.js 20+** (tested on 25).
+
+```bash
+cp .env.example .env
+# edit .env: set DATABASE_PROVIDER=sqlite and DATABASE_URL=file:./dev.db
+#            and a SESSION_SECRET of 32+ random characters (openssl rand -base64 32)
+npm install
+npm run db:setup      # create tables + seed reference and sample data
+npm run dev           # http://localhost:3000
+```
+
+### Logins created by the seed
+
+| Username | Password | Role | Notes |
+|---|---|---|---|
+| `admin` | `admin123` | Admin | **Must change password at first login** |
+| `accountant` | `password123` | Accountant | sample data only |
+| `site1` | `password123` | Site In-charge | assigned to PRJ-001, PRJ-003 |
+| `site2` | `password123` | Site In-charge | assigned to PRJ-002 |
+
+The seed always creates the admin user, the Head Office cost center, the default heads/sub-heads
+and settings. Sample users, projects, vendors, workers and ~100 expenses are added only to an
+empty database; skip them with `SEED_SAMPLE_DATA=false npm run db:seed`.
+**Delete or deactivate the sample users before going live.**
+
+---
+
+## Production setup (PostgreSQL)
+
+1. **Database** (PostgreSQL 14+):
+   ```sql
+   CREATE USER pem WITH PASSWORD 'choose-a-strong-password';
+   CREATE DATABASE project_expense_manager OWNER pem;
+   ```
+2. **Configure** — copy `.env.example` to `.env` and set:
+
+   | Variable | Example | Purpose |
+   |---|---|---|
+   | `DATABASE_PROVIDER` | `postgresql` | `postgresql` (production) or `sqlite` (dev) |
+   | `DATABASE_URL` | `postgresql://pem:…@localhost:5432/project_expense_manager?schema=public` | connection string |
+   | `SESSION_SECRET` | 32+ random chars | encrypts the login cookie — keep secret, never commit |
+   | `SESSION_COOKIE_SECURE` | `true` | set `true` when served over HTTPS |
+   | `UPLOAD_DIR` | `/var/lib/pem/uploads` | receipts + logo (outside the web root; served only to logged-in users) |
+   | `APP_URL` | `https://expenses.example.com` | makes expense numbers clickable in Excel exports |
+   | `BACKUP_DIR`, `BACKUP_KEEP_DAYS` | `/var/backups/pem`, `30` | used by `scripts/backup.sh` |
+
+3. **Install, migrate, seed, build, start**:
+   ```bash
+   npm ci
+   npm run db:migrate    # applies prisma/migrations (safe to re-run on every deploy)
+   npm run db:seed       # first deploy only; add SEED_SAMPLE_DATA=false for a clean start
+   npm run build
+   npm start             # serves on port 3000 (PORT=… to change)
+   ```
+4. **Keep it running** with systemd or PM2 (e.g. `pm2 start npm --name pem -- start`) and put
+   it behind Nginx/Caddy with HTTPS. Raise the proxy's upload limit to ~30 MB
+   (Nginx: `client_max_body_size 30m;`) so several receipts can be sent at once.
+5. Log in as `admin`, change the password, then fill in **Settings → Company** (name, address,
+   logo) and create the real users.
+
+### Deploying updates
+
+```bash
+git pull && npm ci && npm run db:migrate && npm run build && pm2 restart pem
+```
+
+---
+
+## Backups (daily)
+
+`scripts/backup.sh` writes a compressed `pg_dump` of the database **and** a `tar.gz` of the
+upload folder (receipts) to `BACKUP_DIR`, and deletes backups older than `BACKUP_KEEP_DAYS`.
+It needs the PostgreSQL client tools (`pg_dump`) on the server.
+
+```bash
+./scripts/backup.sh          # test it once by hand
+crontab -e                   # then schedule it, e.g. every night at 02:30:
+30 2 * * * /opt/project-expense-manager/scripts/backup.sh >> /var/log/pem-backup.log 2>&1
+```
+
+**Copy the backup folder off the server** (another machine, cloud storage, or USB drive) —
+a backup on the same disk does not survive a disk failure. Test a restore occasionally:
+
+```bash
+gunzip -c backups/db-2026-10-15_0230.sql.gz | psql "postgresql://pem:…@localhost:5432/project_expense_manager"
+tar -xzf backups/uploads-2026-10-15_0230.tar.gz -C /var/lib/pem/   # restores the uploads folder
+```
+
+(Restore into an empty database; drop and recreate it first if needed.)
+
+---
+
+## Business rules and where they are enforced
+
+All rules are enforced on the **server**, in the service layer (`src/server/services/`); the UI
+only mirrors them. Each one is covered by tests in `tests/`.
+
+| # | Rule | Where |
+|---|---|---|
+| 1 | Required fields, amount > 0, cheque number for cheques | `src/lib/validation/expenses.ts` (zod, used by client **and** server) |
+| 2 | Sub-head belongs to head; disabled heads/sub-heads not usable for new entries | `expense-service.ts` → `validateAllocation` |
+| 3 | No new expenses on Completed projects | `expense-service.ts` → `validateAllocation` |
+| 4 | Site In-charge: only assigned projects, cannot approve | `project-service.ts` → `assertProjectAccess`, `expenseScope`; `src/lib/permissions.ts` |
+| 5 | Pending → Approved/Rejected (reason); approved locked except Admin (logged); auto-approve setting | `src/lib/expense-rules.ts`, `expense-service.ts` |
+| 6 | Only Approved count in totals (reports can include pending) | `totals.ts` → `COUNTABLE`, `report-service.ts` |
+| 7 | Split lines sum exactly to the bill; rows share `split_group_id` | `splitExpenseSchema` (integer-paisa maths), `createExpenses` |
+| 8 | Soft delete; deleted rows never in totals | every service filters `deletedAt: null` |
+| 9 | Decimal money, `PKR 1,250,000`, `DD-MM-YYYY` | Prisma `Decimal`, `src/lib/money.ts`, `src/lib/format.ts` |
+
+Other decisions made during the build:
+
+- A split bill is approved, rejected and deleted **as one bill**; editing changes one line.
+- Projects, vendors and workers that already have expenses cannot be deleted (reports would
+  lose them) — mark the project *Completed* / the worker *inactive* instead.
+- The last active Admin cannot be demoted or deactivated.
+- Labour advances are expenses with sub-head **"Advance to labour"** under **"Labour"** —
+  keep those names if you rename things.
+- Expense numbers `EXP-YYYY-NNNNN` restart each year and are never reused.
+
+---
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | development server |
+| `npm run build` / `npm start` | production build / server |
+| `npm test` | all tests on a throw-away SQLite DB (`prisma/sqlite/test.db`) |
+| `TEST_DATABASE_URL=postgresql://… npm test` | same tests on PostgreSQL — **that database is wiped** |
+| `npm run lint` | ESLint |
+| `npm run db:setup` | migrate + generate + seed |
+| `npm run db:migrate` | apply migrations (SQLite dev: `db push`) |
+| `npm run db:migrate:new -- --name <change>` | create a new migration after editing `prisma/schema.prisma` (Postgres) |
+| `npm run db:seed` | seed reference (+ sample) data |
+| `npm run db:studio` | browse the database in Prisma Studio |
+
+`prisma/schema.prisma` targets PostgreSQL and is the source of truth.
+`scripts/prisma.mjs` derives an SQLite copy (`prisma/sqlite/`) when `DATABASE_PROVIDER=sqlite`.
+
+## Project structure
+
+```
+docs/                      specification (Phase 1 scope, features, DB, screens, roadmap)
+prisma/                    schema.prisma, migrations/, seed.ts
+scripts/                   prisma.mjs (provider switch), backup.sh
+src/app/(app)/             pages behind login (dashboard, expenses, projects, …)
+src/app/api/               receipt download, logo, report exports
+src/app/login, change-password
+src/components/            UI components (ui/ = shadcn-style primitives)
+src/lib/                   shared, client-safe code: validation (zod), money, formatting, permissions
+src/server/services/       business logic — all rules live here
+src/server/reports/        Excel + PDF writers
+src/proxy.ts               optimistic auth/role redirects (real checks are in the services)
+tests/                     Vitest tests for the business rules
+```
+
+## Not in Phase 1
+
+Double-entry accounting, attendance & payroll, purchase orders / inventory, travel workflows,
+invoicing, tax, bank reconciliation, mobile app, Urdu UI — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
+The data model (every expense has project + head + sub-head) is ready for those phases.
