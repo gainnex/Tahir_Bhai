@@ -85,7 +85,7 @@ function TableBlock({ table }: { table: ReportTable }) {
 async function loadLogo(settings: AppSettings) {
   if (!settings.logoPath) return null;
   try {
-    const data = await readUpload(settings.logoPath);
+    const data = Buffer.from(await readUpload(settings.logoPath));
     return { data, format: settings.logoPath.endsWith(".png") ? ("png" as const) : ("jpg" as const) };
   } catch {
     return null; // missing logo file must not break the report

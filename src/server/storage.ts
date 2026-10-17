@@ -1,10 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { AwsClient } from "aws4fetch";
 import { AppError } from "@/lib/errors";
 
-// Files live on local disk under UPLOAD_DIR (outside /public). They are only ever
-// served through route handlers that check the user's session and access rights.
+// Files live in a private Cloudflare R2 bucket when R2_* is configured (hosted deployments,
+// whose disk is read-only or wiped on deploy), otherwise on local disk under UPLOAD_DIR.
+// Either way they are only ever served through route handlers that check the user's
+// session and access rights.
 
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB
 
@@ -46,9 +49,19 @@ export async function saveUpload(file: File, folder: string, allowed: UploadMime
     String(now.getMonth() + 1).padStart(2, "0"),
     `${randomUUID()}.${TYPES[mime].ext}`,
   );
-  const abs = resolveUpload(rel);
-  await mkdir(path.dirname(abs), { recursive: true });
-  await writeFile(abs, bytes);
+  const bucket = r2();
+  if (bucket) {
+    const res = await bucket.client.fetch(bucket.url(rel), {
+      method: "PUT",
+      body: bytes,
+      headers: { "Content-Type": mime },
+    });
+    if (!res.ok) throw new Error(`R2 upload failed (${res.status}): ${await res.text()}`);
+  } else {
+    const abs = resolveUpload(rel);
+    await mkdir(path.dirname(abs), { recursive: true });
+    await writeFile(abs, bytes);
+  }
 
   return {
     fileName: path.basename(file.name).slice(0, 200) || `file.${TYPES[mime].ext}`,
@@ -66,8 +79,34 @@ export function resolveUpload(rel: string) {
   return abs;
 }
 
-export async function readUpload(rel: string) {
-  return readFile(resolveUpload(rel));
+/** File contents; a missing file throws an error with code "ENOENT" (like fs does). */
+export async function readUpload(rel: string): Promise<Uint8Array> {
+  const bucket = r2();
+  if (!bucket) return readFile(resolveUpload(rel));
+  if (rel.split("/").includes("..")) throw new AppError("Invalid file path.");
+  const res = await bucket.client.fetch(bucket.url(rel));
+  if (res.status === 404) throw Object.assign(new Error(`File not found: ${rel}`), { code: "ENOENT" });
+  if (!res.ok) throw new Error(`R2 download failed (${res.status})`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+let r2Cache: { client: AwsClient; url: (rel: string) => string } | null | undefined;
+
+/** R2 (via its S3-compatible API) when all R2_* variables are set, otherwise null. */
+function r2() {
+  if (r2Cache !== undefined) return r2Cache;
+  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET } = process.env;
+  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET) return (r2Cache = null);
+  const base = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET}/`;
+  return (r2Cache = {
+    client: new AwsClient({
+      accessKeyId: R2_ACCESS_KEY_ID,
+      secretAccessKey: R2_SECRET_ACCESS_KEY,
+      service: "s3",
+      region: "auto",
+    }),
+    url: (rel) => base + rel.split("/").map(encodeURIComponent).join("/"),
+  });
 }
 
 /** Non-empty File objects from a multi-file input. */

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useFieldArray, useWatch } from "react-hook-form";
-import { CheckCircle2, FileText, ImageIcon, Plus, Split, Trash2 } from "lucide-react";
+import { CheckCircle2, FileText, ImageIcon, Plus, Split, Trash2, Upload } from "lucide-react";
 import { ActionForm, ComboboxField, DateField, MoneyField, TextareaField, TextField } from "@/components/forms/fields";
 import { FormStatus } from "@/components/forms/form-status";
 import { useActionForm } from "@/components/forms/use-action-form";
@@ -507,14 +507,37 @@ export function ExpenseForm({ mode, action, options, values, attachments = [], d
               ))}
             </ul>
           )}
-          <Input
-            name="files"
-            type="file"
-            multiple
-            accept="image/jpeg,image/png,application/pdf"
-            onChange={(e) => setPickedFiles(Array.from(e.target.files ?? []))}
-            className="h-auto cursor-pointer py-2"
-          />
+          {/* The real input covers the whole drop zone (invisible) so click and drag-and-drop both work. */}
+          <div className="relative flex flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-border px-4 py-6 text-center transition-colors hover:border-primary/60 hover:bg-muted/40 has-[:focus-visible]:border-primary has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50">
+            <Upload className="size-6 text-muted-foreground" />
+            <p className="text-sm">
+              <span className="font-medium text-primary">Click to upload</span> or drag and drop
+            </p>
+            <p className="text-xs text-muted-foreground">JPG, PNG or PDF · up to 5 MB each</p>
+            <input
+              name="files"
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,application/pdf"
+              aria-label="Upload receipts"
+              onChange={(e) => setPickedFiles(Array.from(e.target.files ?? []))}
+              className="absolute inset-0 cursor-pointer opacity-0"
+            />
+          </div>
+          {pickedFiles.length > 0 && (
+            <ul className="space-y-1 text-sm">
+              {pickedFiles.map((x, i) => (
+                <li key={i} className="flex items-center gap-2 text-muted-foreground">
+                  {x.type === "application/pdf" ? (
+                    <FileText className="size-4 shrink-0 text-rose-600" />
+                  ) : (
+                    <ImageIcon className="size-4 shrink-0" />
+                  )}
+                  <span className="truncate">{x.name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           {pickedFiles.some((x) => x.type === "application/pdf" && x.size > 5 * 1024 * 1024) && (
             <p className="text-xs text-destructive">A selected PDF is larger than 5 MB and will be refused.</p>
           )}

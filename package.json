@@ -21,6 +21,7 @@
     "@prisma/client": "^6.19.3",
     "@react-pdf/renderer": "^4.9.0",
     "@tanstack/react-table": "^8.21.3",
+    "aws4fetch": "^1.0.20",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
