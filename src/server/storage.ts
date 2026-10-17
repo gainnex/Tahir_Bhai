@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { AwsClient } from "aws4fetch";
+import { get, put } from "@vercel/blob";
 import { AppError } from "@/lib/errors";
 
-// Files live in a private Cloudflare R2 bucket when R2_* is configured (hosted deployments,
-// whose disk is read-only or wiped on deploy), otherwise on local disk under UPLOAD_DIR.
+// Files live in a private Vercel Blob store when BLOB_READ_WRITE_TOKEN is set (hosted
+// deployments, whose disk is read-only), otherwise on local disk under UPLOAD_DIR.
 // Either way they are only ever served through route handlers that check the user's
 // session and access rights.
 
@@ -49,14 +49,8 @@ export async function saveUpload(file: File, folder: string, allowed: UploadMime
     String(now.getMonth() + 1).padStart(2, "0"),
     `${randomUUID()}.${TYPES[mime].ext}`,
   );
-  const bucket = r2();
-  if (bucket) {
-    const res = await bucket.client.fetch(bucket.url(rel), {
-      method: "PUT",
-      body: bytes,
-      headers: { "Content-Type": mime },
-    });
-    if (!res.ok) throw new Error(`R2 upload failed (${res.status}): ${await res.text()}`);
+  if (blobEnabled()) {
+    await put(rel, Buffer.from(bytes), { access: "private", contentType: mime });
   } else {
     const abs = resolveUpload(rel);
     await mkdir(path.dirname(abs), { recursive: true });
@@ -81,32 +75,14 @@ export function resolveUpload(rel: string) {
 
 /** File contents; a missing file throws an error with code "ENOENT" (like fs does). */
 export async function readUpload(rel: string): Promise<Uint8Array> {
-  const bucket = r2();
-  if (!bucket) return readFile(resolveUpload(rel));
-  if (rel.split("/").includes("..")) throw new AppError("Invalid file path.");
-  const res = await bucket.client.fetch(bucket.url(rel));
-  if (res.status === 404) throw Object.assign(new Error(`File not found: ${rel}`), { code: "ENOENT" });
-  if (!res.ok) throw new Error(`R2 download failed (${res.status})`);
-  return new Uint8Array(await res.arrayBuffer());
+  if (!blobEnabled()) return readFile(resolveUpload(rel));
+  const res = await get(rel, { access: "private" });
+  if (!res || !res.stream) throw Object.assign(new Error(`File not found: ${rel}`), { code: "ENOENT" });
+  return new Uint8Array(await new Response(res.stream).arrayBuffer());
 }
 
-let r2Cache: { client: AwsClient; url: (rel: string) => string } | null | undefined;
-
-/** R2 (via its S3-compatible API) when all R2_* variables are set, otherwise null. */
-function r2() {
-  if (r2Cache !== undefined) return r2Cache;
-  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET } = process.env;
-  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET) return (r2Cache = null);
-  const base = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET}/`;
-  return (r2Cache = {
-    client: new AwsClient({
-      accessKeyId: R2_ACCESS_KEY_ID,
-      secretAccessKey: R2_SECRET_ACCESS_KEY,
-      service: "s3",
-      region: "auto",
-    }),
-    url: (rel) => base + rel.split("/").map(encodeURIComponent).join("/"),
-  });
+function blobEnabled() {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 
 /** Non-empty File objects from a multi-file input. */
