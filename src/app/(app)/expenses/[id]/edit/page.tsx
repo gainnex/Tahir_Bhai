@@ -60,6 +60,8 @@ export default async function EditExpensePage({ params }: PageProps<"/expenses/[
           paidFromId: e.paidFromId,
           referenceNo: e.referenceNo ?? "",
           description: e.description,
+          gstAmount: e.gstAmount?.toFixed(2).replace(/\.00$/, "") ?? "",
+          whtAmount: e.whtAmount?.toFixed(2).replace(/\.00$/, "") ?? "",
         }}
         today={todayPK()}
         currency={settings.currencyLabel}

@@ -54,7 +54,7 @@ export async function cashBalances(workerIds?: number[], opts: { before?: Date }
         paidFromId: idFilter ?? { not: null },
         ...(dateFilter ? { date: dateFilter } : {}),
       },
-      _sum: { amount: true },
+      _sum: { amount: true, whtAmount: true },
       _count: true,
     }),
   ]);
@@ -77,9 +77,11 @@ export async function cashBalances(workerIds?: number[], opts: { before?: Date }
   for (const r of spent) {
     if (r.paidFromId === null) continue;
     const b = get(r.paidFromId);
-    if (r.status === "APPROVED") b.spent = b.spent.plus(r._sum.amount ?? ZERO);
+    // Withholding tax stays with the employee (the company pays it to the tax office)
+    const paid = (r._sum.amount ?? ZERO).minus(r._sum.whtAmount ?? ZERO);
+    if (r.status === "APPROVED") b.spent = b.spent.plus(paid);
     else {
-      b.pendingSpent = b.pendingSpent.plus(r._sum.amount ?? ZERO);
+      b.pendingSpent = b.pendingSpent.plus(paid);
       b.pendingCount += r._count;
     }
   }
@@ -210,7 +212,7 @@ export async function getCashStatement(actor: Actor, workerId: number, opts: { f
         project: x.project,
         paymentMode: x.paymentMode,
         moneyIn: null,
-        moneyOut: x.amount,
+        moneyOut: x.whtAmount ? x.amount.minus(x.whtAmount) : x.amount,
         status: x.status === "PENDING" ? "PENDING" : "APPROVED",
       }),
     ),

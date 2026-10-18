@@ -13,6 +13,9 @@ The full specification is in [`docs/`](docs/README.md) (features, database, scre
 - **Expenses** with receipt upload (JPG/PNG/PDF, 5 MB each, photos auto-shrunk on phones), five
   payment modes, vendor/worker picker, **split bills** across projects/heads, list with filters and
   filtered total, Excel/PDF export.
+- **Taxes**: optional GST (included in the amount) and withholding tax (deducted from the
+  payment) on each expense; net paid = amount − WHT. A split bill's taxes are shared across its
+  lines in proportion to their amounts.
 - **Approval**: Pending → Approved / Rejected (reason required). Approved entries are locked
   (only Admin can edit, always logged). Optional auto-approve for Admin/Accountant entries.
 - **Vendors** and an **employee register** (labour, permanent and part-time staff) with labour
@@ -20,8 +23,8 @@ The full specification is in [`docs/`](docs/README.md) (features, database, scre
 - **Cash in hand** per employee: opening balance, funds given (cash / online transfer), cash
   returned, and expenses marked *Paid from* that employee. Running-balance statement per employee;
   an employee whose login is linked sees their own.
-- **Dashboard** and **5 reports** (Project Cost Summary, Expense Head, Project Ledger, Labour
-  Payments, Vendors) with Excel and PDF export (company name, address and logo on the PDF).
+- **Dashboard** and **6 reports** (Project Cost Summary, Expense Head, Project Ledger, Employee
+  Expenses, Vendors with GST/WHT, Tax report per payee with NTN) with Excel and PDF export (company name, address and logo on the PDF).
 - **Users & roles**: Admin, Accountant, Site In-charge (sees and enters only for assigned projects).
 - **Activity log** of every create / edit / approve / reject / delete / login with old → new values.
 - Soft delete everywhere, exact decimal money (never floats), `PKR 1,250,000`, dates `DD-MM-YYYY`.
@@ -157,7 +160,10 @@ Other decisions made during the build:
 - Cash in hand (`cash-service.ts`): balance = opening + given − returned − **approved** expenses
   paid from it. Only Admin / Accountant record cash entries (`CSH-YYYY-NNNNN`). A Site In-charge can
   only mark expenses as paid from their **own** cash (their login linked on the employee record).
-  A negative balance means the company owes the employee.
+  A negative balance means the company owes the employee. Withholding tax on an expense paid
+  from cash stays with the employee, so the balance goes down by the net paid.
+- Taxes: `amount` stays the gross bill (the project's cost, used by every total); `gst_amount`
+  and `wht_amount` are optional parts of it, each ≤ the amount (`expenses.ts` zod schemas).
 
 ---
 
@@ -199,5 +205,5 @@ tests/                     Vitest tests for the business rules
 ## Not in Phase 1
 
 Double-entry accounting, attendance & payroll, purchase orders / inventory, travel workflows,
-invoicing, tax, bank reconciliation, mobile app, Urdu UI — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
+invoicing, tax filing / tax rates, bank reconciliation, mobile app, Urdu UI — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
 The data model (every expense has project + head + sub-head) is ready for those phases.

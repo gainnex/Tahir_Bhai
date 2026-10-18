@@ -39,3 +39,18 @@ export function multiplyMoney(rate: string, quantity: string): string {
   const product = toPaisa(rate) * qHundredths; // paisa × hundredths
   return fromPaisa((product + 50n) / 100n);
 }
+
+/**
+ * Share `total` across lines in proportion to `weights` (e.g. a split bill's GST across its
+ * lines). Each share is rounded down to the paisa and the leftover paisa go to the last line,
+ * so the shares always add up exactly to `total`. "100" over ["1", "2"] -> ["33.33", "66.67"].
+ */
+export function apportionMoney(total: string, weights: string[]): string[] {
+  const t = toPaisa(total);
+  const w = weights.map(toPaisa);
+  const sum = w.reduce((a, b) => a + b, 0n);
+  if (sum === 0n) throw new Error("Cannot apportion over zero weights");
+  const shares = w.map((x) => (t * x) / sum);
+  shares[shares.length - 1] += t - shares.reduce((a, b) => a + b, 0n);
+  return shares.map(fromPaisa);
+}

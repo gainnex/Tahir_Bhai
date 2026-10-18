@@ -5,6 +5,7 @@ import { LABOUR_HEAD } from "@/lib/defaults";
 import { AppError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { canApproveExpense, canDeleteExpense, canEditExpense, initialStatus } from "@/lib/expense-rules";
 import { parseInputDate } from "@/lib/format";
+import { apportionMoney, toPaisa } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import {
   MAX_ATTACHMENTS,
@@ -301,6 +302,11 @@ async function validateParties(vendorId: number | null, workerId: number | null)
   }
 }
 
+/** Optional tax amount -> column value; blank or zero means no tax. */
+function taxValue(v: string | null) {
+  return v && toPaisa(v) > 0n ? new Prisma.Decimal(v) : null;
+}
+
 async function saveFiles(files: File[]): Promise<StoredFile[]> {
   const stored: StoredFile[] = [];
   for (const f of files) stored.push(await saveUpload(f, "receipts", RECEIPT_TYPES));
@@ -344,10 +350,20 @@ export type CreateExpenseInput =
 /** Create an expense, a split bill (several linked rows) or a labour payment. Returns new ids. */
 export async function createExpenses(actor: Actor, input: CreateExpenseInput, files: File[] = []) {
   const d = input.data;
-  const lines: (Allocation & { amount: string })[] =
-    input.kind === "split"
-      ? input.data.lines
-      : [{ projectId: input.data.projectId, headId: input.data.headId, subheadId: input.data.subheadId, amount: input.data.amount }];
+  type Line = Allocation & { amount: string; gstAmount: string | null; whtAmount: string | null };
+  let lines: Line[];
+  if (input.kind === "split") {
+    // The bill's taxes are shared across its lines in proportion to each line's amount.
+    const weights = input.data.lines.map((l) => l.amount);
+    const gst = d.gstAmount ? apportionMoney(d.gstAmount, weights) : null;
+    const wht = d.whtAmount ? apportionMoney(d.whtAmount, weights) : null;
+    lines = input.data.lines.map((l, i) => ({ ...l, gstAmount: gst?.[i] ?? null, whtAmount: wht?.[i] ?? null }));
+  } else {
+    const x = input.data;
+    lines = [
+      { projectId: x.projectId, headId: x.headId, subheadId: x.subheadId, amount: x.amount, gstAmount: x.gstAmount, whtAmount: x.whtAmount },
+    ];
+  }
 
   for (const line of lines) {
     const { head } = await validateAllocation(actor, line);
@@ -377,6 +393,8 @@ export async function createExpenses(actor: Actor, input: CreateExpenseInput, fi
             headId: line.headId,
             subheadId: line.subheadId,
             amount: new Prisma.Decimal(line.amount),
+            gstAmount: taxValue(line.gstAmount),
+            whtAmount: taxValue(line.whtAmount),
             paymentMode: d.paymentMode,
             chequeNo: d.paymentMode === "CHEQUE" ? d.chequeNo : null,
             paidTo: d.paidTo,
@@ -460,6 +478,8 @@ export async function updateExpense(
     headId: data.headId,
     subheadId: data.subheadId,
     amount: new Prisma.Decimal(data.amount),
+    gstAmount: taxValue(data.gstAmount),
+    whtAmount: taxValue(data.whtAmount),
     paymentMode: data.paymentMode,
     chequeNo: data.paymentMode === "CHEQUE" ? data.chequeNo : null,
     paidTo: data.paidTo,

@@ -42,6 +42,7 @@ export const REPORT_SLUGS = [
   "project-ledger",
   "labour-payments",
   "vendors",
+  "tax",
   "expenses",
 ] as const;
 export type ReportSlug = (typeof REPORT_SLUGS)[number];
@@ -80,6 +81,12 @@ export const REPORTS: Record<
   vendors: {
     title: "Vendor Report",
     description: "Total paid per vendor — pick a vendor to see the individual entries.",
+    filters: ["project", "vendor"],
+    defaultPeriod: "month",
+  },
+  tax: {
+    title: "Tax Report",
+    description: "GST and withholding tax on expenses — totals per payee and every taxed entry, for tax returns.",
     filters: ["project", "vendor"],
     defaultPeriod: "month",
   },

@@ -45,6 +45,8 @@ export type ExpenseFormValues = {
   paidFromId: number | null;
   referenceNo: string;
   description: string;
+  gstAmount: string;
+  whtAmount: string;
 };
 
 type Line = { projectId: string; headId: string; subheadId: string; amount: string };
@@ -65,6 +67,8 @@ type FormValues = {
   paidTo: string;
   referenceNo: string;
   description: string;
+  gstAmount: string;
+  whtAmount: string;
   lines: Line[];
 };
 
@@ -134,15 +138,17 @@ export function ExpenseForm({ mode, action, options, values, attachments = [], d
       paidTo: values?.paidTo ?? (startWorker ? workerById.get(startWorker)?.name ?? "" : ""),
       referenceNo: values?.referenceNo ?? "",
       description: values?.description ?? "",
+      gstAmount: values?.gstAmount ?? "",
+      whtAmount: values?.whtAmount ?? "",
       lines: [blankLine(), blankLine()],
     },
   });
   const { control, setValue, getValues, getFieldState, register, formState } = f.form;
   const lines = useFieldArray({ control, name: "lines" });
 
-  const [headId, workerId, paymentMode, billTotal, lineValues] = useWatch({
+  const [headId, workerId, paymentMode, amount, billTotal, whtAmount, lineValues] = useWatch({
     control,
-    name: ["headId", "workerId", "paymentMode", "billTotal", "lines"],
+    name: ["headId", "workerId", "paymentMode", "amount", "billTotal", "whtAmount", "lines"],
   });
   const worker = workerId ? workerById.get(Number(workerId)) : undefined;
 
@@ -206,6 +212,10 @@ export function ExpenseForm({ mode, action, options, values, attachments = [], d
   const linesTotal = (lineValues ?? []).reduce((s, l) => s + moneyOrZero(l?.amount), 0n);
   const difference = moneyOrZero(billTotal) - linesTotal;
   const linesError = formState.errors.lines?.message ?? formState.errors.lines?.root?.message;
+  // What the payee actually receives once withholding tax is deducted
+  const gross = moneyOrZero(split ? billTotal : amount);
+  const withheld = moneyOrZero(whtAmount);
+  const netPaid = gross - withheld;
 
   return (
     <ActionForm f={f} className="max-w-3xl space-y-5 pb-24 sm:pb-0">
@@ -419,6 +429,41 @@ export function ExpenseForm({ mode, action, options, values, attachments = [], d
           />
         </CardContent>
       </Card>
+
+      {/* ---- Taxes ---- */}
+      {mode === "expense" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Taxes</CardTitle>
+            <CardDescription>
+              Optional. Enter the {split ? "bill total" : "amount"} as the full bill including GST.
+              {split && " The taxes are shared across the split lines in proportion to their amounts."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <MoneyField
+              name="gstAmount"
+              label={`GST / sales tax (${currency})`}
+              description="Included in the bill"
+              inputClassName={big}
+            />
+            <MoneyField
+              name="whtAmount"
+              label={`Withholding tax (${currency})`}
+              description="Deducted from the payment"
+              inputClassName={big}
+            />
+            {withheld > 0n && gross > 0n && (
+              <p className="rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground sm:col-span-2">
+                Net paid to payee:{" "}
+                <span className="font-mono font-semibold text-foreground tabular-nums">
+                  {currency} {formatAmount(fromPaisa(netPaid))}
+                </span>
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ---- Split lines ---- */}
       {split && (

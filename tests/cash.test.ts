@@ -62,6 +62,8 @@ const expense = (paidFromId: number | null, extra: Partial<ExpenseInput> = {}): 
   paidFromId,
   referenceNo: null,
   description: "Nails",
+  gstAmount: null,
+  whtAmount: null,
   ...extra,
 });
 

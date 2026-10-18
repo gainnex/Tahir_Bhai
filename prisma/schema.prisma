@@ -230,7 +230,11 @@ model Expense {
   projectId       Int           @map("project_id")
   headId          Int           @map("head_id")
   subheadId       Int           @map("subhead_id")
+  // Gross bill amount (the project's cost). GST is the part of it that is sales tax; withholding
+  // tax is deducted when paying, so the payee receives amount - whtAmount.
   amount          Decimal       @db.Decimal(14, 2)
+  gstAmount       Decimal?      @map("gst_amount") @db.Decimal(14, 2)
+  whtAmount       Decimal?      @map("wht_amount") @db.Decimal(14, 2)
   paymentMode     PaymentMode   @map("payment_mode")
   chequeNo        String?       @map("cheque_no")
   paidTo          String        @map("paid_to")

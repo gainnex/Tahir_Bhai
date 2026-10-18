@@ -21,6 +21,8 @@ const LABELS: Record<string, string> = {
   paymentMode: "Payment mode",
   chequeNo: "Cheque no.",
   referenceNo: "Reference",
+  gstAmount: "GST",
+  whtAmount: "Withholding tax",
   rejectionReason: "Rejection reason",
   approvedById: "Approved by",
   approvedAt: "Approved at",
@@ -42,7 +44,7 @@ const LABELS: Record<string, string> = {
 };
 
 const HIDDEN = ["id", "deletedAt", "createdById", "splitGroupId", "passwordHash"];
-const MONEY = ["amount", "budget", "rate"];
+const MONEY = ["amount", "budget", "rate", "gstAmount", "whtAmount"];
 
 function label(key: string) {
   return LABELS[key] ?? key.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());

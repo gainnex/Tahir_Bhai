@@ -17,7 +17,7 @@ import type { Actor } from "@/server/guards";
 import { expenseScope, listExpenses } from "./expense-service";
 import { assertProjectAccess } from "./project-service";
 
-// The five reports (docs/FEATURES.md §9). Business rule 6: only APPROVED expenses count,
+// The reports (docs/FEATURES.md §9, plus the tax report from changes/changes.pdf). Business rule 6: only APPROVED expenses count,
 // unless the "include pending" toggle is on. Deleted rows never count (rule 8).
 
 const ZERO = new Prisma.Decimal(0);
@@ -429,13 +429,20 @@ async function vendorReport(actor: Actor, f: ReportFilters): Promise<Report> {
   const where: Prisma.ExpenseWhereInput = {
     AND: [baseWhere(actor, f), { vendorId: f.vendorId ? f.vendorId : { not: null } }],
   };
-  const grouped = await db.expense.groupBy({ by: ["vendorId"], where, _sum: { amount: true }, _count: true });
+  const grouped = await db.expense.groupBy({
+    by: ["vendorId"],
+    where,
+    _sum: { amount: true, gstAmount: true, whtAmount: true },
+    _count: true,
+  });
   const vendors = await db.vendor.findMany({
     where: { id: { in: grouped.map((g) => g.vendorId!) } },
     select: { id: true, name: true, type: true },
   });
   const vendorById = new Map(vendors.map((v) => [v.id, v]));
   const grand = grouped.reduce((s, g) => s.plus(g._sum.amount ?? ZERO), ZERO);
+  const grandGst = grouped.reduce((s, g) => s.plus(g._sum.gstAmount ?? ZERO), ZERO);
+  const grandWht = grouped.reduce((s, g) => s.plus(g._sum.whtAmount ?? ZERO), ZERO);
   const count = grouped.reduce((s, g) => s + g._count, 0);
 
   const summary: ReportRow[] = grouped
@@ -448,6 +455,9 @@ async function vendorReport(actor: Actor, f: ReportFilters): Promise<Report> {
           type: v ? VENDOR_TYPE_LABELS[v.type] : "",
           entries: g._count,
           total: money(g._sum.amount),
+          gst: money(g._sum.gstAmount),
+          wht: money(g._sum.whtAmount),
+          net: money((g._sum.amount ?? ZERO).minus(g._sum.whtAmount ?? ZERO)),
           share: pct(g._sum.amount ?? ZERO, grand),
         },
         links: { vendor: `/reports/vendors?${filtersToQuery(f, { vendorId: g.vendorId! })}` },
@@ -461,11 +471,22 @@ async function vendorReport(actor: Actor, f: ReportFilters): Promise<Report> {
         { key: "vendor", label: "Vendor", type: "text", wide: true },
         { key: "type", label: "Type", type: "text" },
         { key: "entries", label: "Entries", type: "int" },
-        { key: "total", label: "Total paid", type: "money" },
+        { key: "total", label: "Total billed", type: "money" },
+        { key: "gst", label: "GST", type: "money" },
+        { key: "wht", label: "WHT", type: "money" },
+        { key: "net", label: "Net paid", type: "money" },
         { key: "share", label: "Share", type: "percent" },
       ],
       rows: summary,
-      totals: { vendor: "Total", entries: count, total: money(grand), share: grand.isZero() ? null : 100 },
+      totals: {
+        vendor: "Total",
+        entries: count,
+        total: money(grand),
+        gst: money(grandGst),
+        wht: money(grandWht),
+        net: money(grand.minus(grandWht)),
+        share: grand.isZero() ? null : 100,
+      },
       empty: "No vendor payments in this period.",
     },
   ];
@@ -488,6 +509,8 @@ async function vendorReport(actor: Actor, f: ReportFilters): Promise<Report> {
         { key: "head", label: "Head / Sub-head", type: "text" },
         { key: "description", label: "Description", type: "text", wide: true },
         { key: "amount", label: "Amount", type: "money" },
+        { key: "gst", label: "GST", type: "money" },
+        { key: "wht", label: "WHT", type: "money" },
       ],
       rows: entries.map((e) => ({
         cells: {
@@ -497,10 +520,18 @@ async function vendorReport(actor: Actor, f: ReportFilters): Promise<Report> {
           head: `${e.head.name} / ${e.subhead.name}`,
           description: e.description,
           amount: money(e.amount),
+          gst: e.gstAmount ? money(e.gstAmount) : null,
+          wht: e.whtAmount ? money(e.whtAmount) : null,
         },
         links: { no: `/expenses/${e.id}` },
       })),
-      totals: { date: null, no: "Total", amount: money(entries.reduce((s, e) => s.plus(e.amount), ZERO)) },
+      totals: {
+        date: null,
+        no: "Total",
+        amount: money(entries.reduce((s, e) => s.plus(e.amount), ZERO)),
+        gst: money(entries.reduce((s, e) => s.plus(e.gstAmount ?? ZERO), ZERO)),
+        wht: money(entries.reduce((s, e) => s.plus(e.whtAmount ?? ZERO), ZERO)),
+      },
       empty: "No entries for this vendor in this period.",
     });
   }
@@ -514,6 +545,110 @@ async function vendorReport(actor: Actor, f: ReportFilters): Promise<Report> {
 }
 
 // ---------------------------------------------------------------------------
+// 6. Tax report (GST and withholding tax)
+// ---------------------------------------------------------------------------
+
+async function taxReport(actor: Actor, f: ReportFilters): Promise<Report> {
+  const where: Prisma.ExpenseWhereInput = {
+    AND: [
+      baseWhere(actor, f),
+      f.vendorId ? { vendorId: f.vendorId } : {},
+      { OR: [{ gstAmount: { gt: 0 } }, { whtAmount: { gt: 0 } }] },
+    ],
+  };
+  const entries = await db.expense.findMany({
+    where,
+    orderBy: [{ date: "asc" }, { id: "asc" }],
+    include: { project: { select: { code: true } }, vendor: { select: { name: true, ntn: true } } },
+  });
+
+  // Per payee: a vendor when one is linked, otherwise the "paid to" name
+  type Payee = { name: string; ntn: string; entries: number; amount: Prisma.Decimal; gst: Prisma.Decimal; wht: Prisma.Decimal };
+  const payees = new Map<string, Payee>();
+  for (const e of entries) {
+    const key = e.vendorId ? `v${e.vendorId}` : `p${e.paidTo.trim().toLowerCase()}`;
+    const p = payees.get(key) ?? { name: e.vendor?.name ?? e.paidTo, ntn: e.vendor?.ntn ?? "", entries: 0, amount: ZERO, gst: ZERO, wht: ZERO };
+    p.entries += 1;
+    p.amount = p.amount.plus(e.amount);
+    p.gst = p.gst.plus(e.gstAmount ?? ZERO);
+    p.wht = p.wht.plus(e.whtAmount ?? ZERO);
+    payees.set(key, p);
+  }
+  const total = entries.reduce((s, e) => s.plus(e.amount), ZERO);
+  const gst = entries.reduce((s, e) => s.plus(e.gstAmount ?? ZERO), ZERO);
+  const wht = entries.reduce((s, e) => s.plus(e.whtAmount ?? ZERO), ZERO);
+
+  let vendorName: string | null = null;
+  if (f.vendorId) vendorName = (await db.vendor.findUnique({ where: { id: f.vendorId } }))?.name ?? null;
+
+  return {
+    slug: "tax",
+    title: REPORTS.tax.title,
+    subtitle: await describeFilters(f, [vendorName ? `Vendor: ${vendorName}` : "All payees"]),
+    landscape: true,
+    tables: [
+      {
+        title: "Tax per payee",
+        columns: [
+          { key: "payee", label: "Payee", type: "text", wide: true },
+          { key: "ntn", label: "NTN", type: "text" },
+          { key: "entries", label: "Entries", type: "int" },
+          { key: "amount", label: "Billed", type: "money" },
+          { key: "gst", label: "GST", type: "money" },
+          { key: "wht", label: "WHT", type: "money" },
+          { key: "net", label: "Net paid", type: "money" },
+        ],
+        rows: [...payees.values()]
+          .sort((a, b) => b.gst.plus(b.wht).comparedTo(a.gst.plus(a.wht)))
+          .map((p) => ({
+            cells: {
+              payee: p.name,
+              ntn: p.ntn,
+              entries: p.entries,
+              amount: money(p.amount),
+              gst: money(p.gst),
+              wht: money(p.wht),
+              net: money(p.amount.minus(p.wht)),
+            },
+          })),
+        totals: { payee: "Total", entries: entries.length, amount: money(total), gst: money(gst), wht: money(wht), net: money(total.minus(wht)) },
+        empty: "No GST or withholding tax recorded in this period.",
+      },
+      {
+        title: "Taxed entries",
+        columns: [
+          { key: "date", label: "Date", type: "date" },
+          { key: "no", label: "No.", type: "text" },
+          { key: "project", label: "Project", type: "text" },
+          { key: "payee", label: "Paid to", type: "text", wide: true },
+          { key: "ref", label: "Bill no.", type: "text" },
+          { key: "amount", label: "Amount", type: "money" },
+          { key: "gst", label: "GST", type: "money" },
+          { key: "wht", label: "WHT", type: "money" },
+          { key: "net", label: "Net paid", type: "money" },
+        ],
+        rows: entries.map((e) => ({
+          cells: {
+            date: iso(e.date),
+            no: e.expenseNo,
+            project: e.project.code,
+            payee: e.paidTo,
+            ref: e.referenceNo ?? "",
+            amount: money(e.amount),
+            gst: e.gstAmount ? money(e.gstAmount) : null,
+            wht: e.whtAmount ? money(e.whtAmount) : null,
+            net: money(e.amount.minus(e.whtAmount ?? ZERO)),
+          },
+          links: { no: `/expenses/${e.id}` },
+        })),
+        totals: { date: null, no: "Total", amount: money(total), gst: money(gst), wht: money(wht), net: money(total.minus(wht)) },
+        empty: "No taxed entries in this period.",
+      },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Expense list export (uses the same filters as the /expenses page)
 // ---------------------------------------------------------------------------
 
@@ -523,7 +658,7 @@ export async function expenseListReport(actor: Actor, filters: ExpenseFilters): 
   const result = await listExpenses(actor, { ...filters, page: 1 }, EXPORT_ROW_LIMIT);
   const full = await db.expense.findMany({
     where: { id: { in: result.rows.map((r) => r.id) } },
-    select: { id: true, paymentMode: true, chequeNo: true, description: true, referenceNo: true },
+    select: { id: true, paymentMode: true, chequeNo: true, description: true, referenceNo: true, gstAmount: true, whtAmount: true },
   });
   const extra = new Map(full.map((e) => [e.id, e]));
   const parts = [
@@ -551,6 +686,8 @@ export async function expenseListReport(actor: Actor, filters: ExpenseFilters): 
           { key: "status", label: "Status", type: "text" },
           { key: "enteredBy", label: "Entered by", type: "text" },
           { key: "amount", label: "Amount", type: "money" },
+          { key: "gst", label: "GST", type: "money" },
+          { key: "wht", label: "WHT", type: "money" },
         ],
         rows: result.rows.map((e) => {
           const x = extra.get(e.id);
@@ -568,6 +705,8 @@ export async function expenseListReport(actor: Actor, filters: ExpenseFilters): 
               status: e.status.charAt(0) + e.status.slice(1).toLowerCase(),
               enteredBy: e.createdBy.name,
               amount: money(e.amount),
+              gst: x?.gstAmount ? money(x.gstAmount) : null,
+              wht: x?.whtAmount ? money(x.whtAmount) : null,
             },
             links: { no: `/expenses/${e.id}` },
           };
@@ -592,5 +731,7 @@ export async function buildReport(actor: Actor, slug: Exclude<ReportSlug, "expen
       return labourPayments(actor, f);
     case "vendors":
       return vendorReport(actor, f);
+    case "tax":
+      return taxReport(actor, f);
   }
 }

@@ -28,7 +28,7 @@ async function add(actor: Actor, extra: Partial<ExpenseInput>) {
     kind: "single",
     data: {
       date: "2026-05-10", projectId: p1, headId: materials.id, subheadId: materials.sub, amount: "100",
-      paymentMode: "CASH", chequeNo: null, paidTo: "X", vendorId: null, workerId: null, paidFromId: null, referenceNo: null, description: "d",
+      paymentMode: "CASH", chequeNo: null, paidTo: "X", vendorId: null, workerId: null, paidFromId: null, referenceNo: null, description: "d", gstAmount: null, whtAmount: null,
       ...extra,
     },
   });

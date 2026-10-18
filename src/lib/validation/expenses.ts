@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { dateField, idField, moneyString, optionalId, optionalText, requiredText } from "@/lib/forms";
+import { dateField, idField, moneyString, optionalId, optionalMoney, optionalText, requiredText } from "@/lib/forms";
 import { toPaisa } from "@/lib/money";
 
 export const PAYMENT_MODES = ["CASH", "ONLINE_TRANSFER", "BANK_TRANSFER", "CHEQUE", "JAZZCASH", "EASYPAISA"] as const;
@@ -35,11 +35,38 @@ const common = {
   paidFromId: optionalId,
   referenceNo: optionalText(100),
   description: requiredText("Description", 1000),
+  /** Sales tax included in the amount; null = none */
+  gstAmount: optionalMoney("GST amount"),
+  /** Withholding tax deducted when paying; null = none */
+  whtAmount: optionalMoney("Withholding tax"),
 };
 
 const chequeRule = <T extends { paymentMode: PaymentMode; chequeNo: string | null }>(d: T) =>
   d.paymentMode !== "CHEQUE" || !!d.chequeNo;
 const chequeError = { message: "Cheque number is required for cheque payments", path: ["chequeNo"] };
+
+/** GST and withholding tax are parts of the bill, so neither can exceed it. */
+function taxWithin(
+  tax: "gstAmount" | "whtAmount",
+  total: "amount" | "billTotal",
+): [(d: Record<string, unknown>) => boolean, { message: string; path: string[] }] {
+  return [
+    (d: Record<string, unknown>) => {
+      const t = d[tax];
+      const bill = d[total];
+      if (typeof t !== "string" || typeof bill !== "string") return true;
+      try {
+        return toPaisa(t) <= toPaisa(bill);
+      } catch {
+        return true; // malformed amounts are already reported on their own fields
+      }
+    },
+    {
+      message: `${tax === "gstAmount" ? "GST" : "Withholding tax"} cannot be more than the ${total === "amount" ? "amount" : "bill total"}`,
+      path: [tax],
+    },
+  ];
+}
 
 const allocation = {
   projectId: idField("Project"),
@@ -49,7 +76,11 @@ const allocation = {
 };
 
 /** A normal (single) expense. */
-export const expenseSchema = z.object({ ...common, ...allocation }).refine(chequeRule, chequeError);
+export const expenseSchema = z
+  .object({ ...common, ...allocation })
+  .refine(chequeRule, chequeError)
+  .refine(...taxWithin("gstAmount", "amount"))
+  .refine(...taxWithin("whtAmount", "amount"));
 export type ExpenseInput = z.output<typeof expenseSchema>;
 
 /** A split bill: one bill total, ≥ 2 lines that must add up to it exactly (business rule 7). */
@@ -60,6 +91,8 @@ export const splitExpenseSchema = z
     lines: z.array(z.object(allocation), { error: "Add the split lines" }).min(2, "A split bill needs at least 2 lines"),
   })
   .refine(chequeRule, chequeError)
+  .refine(...taxWithin("gstAmount", "billTotal"))
+  .refine(...taxWithin("whtAmount", "billTotal"))
   .refine(
     (d) => {
       try {
@@ -75,7 +108,9 @@ export type SplitExpenseInput = z.output<typeof splitExpenseSchema>;
 /** Labour payment = a normal expense where a worker is required. */
 export const labourPaymentSchema = z
   .object({ ...common, ...allocation, workerId: idField("Worker") })
-  .refine(chequeRule, chequeError);
+  .refine(chequeRule, chequeError)
+  .refine(...taxWithin("gstAmount", "amount"))
+  .refine(...taxWithin("whtAmount", "amount"));
 
 export const rejectSchema = z.object({ reason: requiredText("Rejection reason", 500) });
 

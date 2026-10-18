@@ -36,7 +36,7 @@ describe("activity log", () => {
     const head = await db.expenseHead.findFirstOrThrow({ where: { name: "Material Purchasing" }, include: { subheads: true } });
     const base = {
       date: "2026-10-01", projectId: p1.id, headId: head.id, subheadId: head.subheads[0].id, amount: "500",
-      paymentMode: "CASH" as const, chequeNo: null, paidTo: "X", vendorId: null, workerId: null, paidFromId: null, referenceNo: null, description: "d",
+      paymentMode: "CASH" as const, chequeNo: null, paidTo: "X", vendorId: null, workerId: null, paidFromId: null, referenceNo: null, description: "d", gstAmount: null, whtAmount: null,
     };
     const [id] = await createExpenses(acc, { kind: "single", data: base });
     await updateExpense(a, id, { ...base, projectId: p2.id }); // admin edits an (auto-)approved entry

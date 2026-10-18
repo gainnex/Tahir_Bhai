@@ -135,6 +135,23 @@ export default async function ExpenseDetailPage({ params, searchParams }: PagePr
                 <Row label="Amount">
                   <span className="font-mono font-semibold tabular-nums">{formatPKR(e.amount, cur)}</span>
                 </Row>
+                {e.gstAmount && (
+                  <Row label="GST / sales tax">
+                    <span className="font-mono tabular-nums">{formatPKR(e.gstAmount, cur)}</span>
+                    <span className="text-muted-foreground"> · included in the amount</span>
+                  </Row>
+                )}
+                {e.whtAmount && (
+                  <>
+                    <Row label="Withholding tax">
+                      <span className="font-mono tabular-nums">{formatPKR(e.whtAmount, cur)}</span>
+                      <span className="text-muted-foreground"> · deducted from the payment</span>
+                    </Row>
+                    <Row label="Net paid">
+                      <span className="font-mono font-semibold tabular-nums">{formatPKR(e.amount.minus(e.whtAmount), cur)}</span>
+                    </Row>
+                  </>
+                )}
                 <Row label="Project">
                   <Link href={`/projects/${e.project.id}`} className="text-primary hover:underline">
                     {e.project.code} — {e.project.name}
