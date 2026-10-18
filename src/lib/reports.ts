@@ -44,13 +44,16 @@ export const REPORT_SLUGS = [
   "vendors",
   "tax",
   "expenses",
+  "wage-sheet",
 ] as const;
 export type ReportSlug = (typeof REPORT_SLUGS)[number];
+/** Reports listed under Reports with the shared filters; the others have their own pages. */
+export type StandardReportSlug = Exclude<ReportSlug, "expenses" | "wage-sheet">;
 
 export type ReportFilterKey = "project" | "head" | "worker" | "vendor";
 
 export const REPORTS: Record<
-  Exclude<ReportSlug, "expenses">,
+  StandardReportSlug,
   { title: string; description: string; filters: ReportFilterKey[]; projectRequired?: boolean; defaultPeriod: Period }
 > = {
   "project-cost-summary": {

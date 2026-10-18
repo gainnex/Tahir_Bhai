@@ -9,7 +9,7 @@ The full specification is in [`docs/`](docs/README.md) (features, database, scre
 
 - **Projects** with optional budgets, a built-in *Head Office / General* cost center, budget bars
   (green < 80 %, amber 80–100 %, red > 100 %) and a profile page with spend by head.
-- **Expense heads & sub-heads** (9 heads / 32 sub-heads pre-loaded), add / rename / disable.
+- **Expense heads & sub-heads** (9 heads / 33 sub-heads pre-loaded), add / rename / disable.
 - **Expenses** with receipt upload (JPG/PNG/PDF, 5 MB each, photos auto-shrunk on phones), five
   payment modes, vendor/worker picker, **split bills** across projects/heads, list with filters and
   filtered total, Excel/PDF export.
@@ -20,6 +20,12 @@ The full specification is in [`docs/`](docs/README.md) (features, database, scre
   (only Admin can edit, always logged). Optional auto-approve for Admin/Accountant entries.
 - **Vendors** and an **employee register** (labour, permanent and part-time staff) with labour
   payments (days × rate helper) and advances.
+- **Attendance (office)**: mark each employee Present / Half day / Absent / Leave per day (one tap
+  each, "mark the rest present"), monthly register (P/H/A/L grid). Site In-charges mark employees
+  whose default project is assigned to them.
+- **Wage sheet** per month (Admin / Accountant): attendance × rate, plus **benefits / rewards /
+  incentives**, less **deductions / advance recovery**, less approved labour payments = balance due;
+  outstanding advance per employee. Excel export; the PDF has a signature column.
 - **Cash in hand** per employee: opening balance, funds given (cash / online transfer), cash
   returned, and expenses marked *Paid from* that employee. Running-balance statement per employee;
   an employee whose login is linked sees their own.
@@ -162,6 +168,12 @@ Other decisions made during the build:
   only mark expenses as paid from their **own** cash (their login linked on the employee record).
   A negative balance means the company owes the employee. Withholding tax on an expense paid
   from cash stays with the employee, so the balance goes down by the net paid.
+- Wages (`src/lib/payroll.ts`, `payroll-service.ts`): daily rate × (present + ½ half days) — leave
+  and unmarked days unpaid; monthly rate = salary − (absent + ½ half days) × salary ÷ days in the
+  month — leave and unmarked days paid. "Paid" = approved Workers-head expenses for that worker in
+  the month, excluding "Advance to labour"; advance balance = advances to month end − advance
+  recoveries. Attendance can't be marked for future dates. Joining / leaving mid-month is not
+  pro-rated.
 - Taxes: `amount` stays the gross bill (the project's cost, used by every total); `gst_amount`
   and `wht_amount` are optional parts of it, each ≤ the amount (`expenses.ts` zod schemas).
 
@@ -204,6 +216,6 @@ tests/                     Vitest tests for the business rules
 
 ## Not in Phase 1
 
-Double-entry accounting, attendance & payroll, purchase orders / inventory, travel workflows,
+Double-entry accounting, payroll posting / payslips, purchase orders / inventory, travel workflows,
 invoicing, tax filing / tax rates, bank reconciliation, mobile app, Urdu UI — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
 The data model (every expense has project + head + sub-head) is ready for those phases.

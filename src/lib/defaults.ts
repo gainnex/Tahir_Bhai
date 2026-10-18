@@ -9,7 +9,7 @@ export const ADVANCE_SUBHEAD = "Advance to labour";
 export const DEFAULT_HEADS: { name: string; subheads: string[] }[] = [
   {
     name: LABOUR_HEAD,
-    subheads: ["Daily wages", "Contractor payments", "Overtime", ADVANCE_SUBHEAD, "Balance payments"],
+    subheads: ["Daily wages", "Salaries", "Contractor payments", "Overtime", ADVANCE_SUBHEAD, "Balance payments"],
   },
   {
     name: "Material Purchasing",

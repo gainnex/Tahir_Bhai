@@ -1,15 +1,18 @@
 import { ForbiddenError, NotFoundError } from "@/lib/errors";
 import { todayPK } from "@/lib/format";
 import { parseReportFilters, REPORT_SLUGS, REPORTS, type Report, type ReportSlug } from "@/lib/reports";
+import { parseMonth } from "@/lib/payroll";
 import { parseExpenseFilters } from "@/lib/validation/expenses";
+import { EMPLOYEE_TYPES, type EmployeeType } from "@/lib/validation/parties";
 import { getCurrentUser } from "@/server/auth";
 import { reportToXlsx } from "@/server/reports/excel";
 import { reportToPdf } from "@/server/reports/pdf";
+import { wageSheetReport } from "@/server/services/payroll-service";
 import { buildReport, expenseListReport } from "@/server/services/report-service";
 import { getSettings } from "@/server/services/settings-service";
 
 // GET /api/reports/<slug>?format=xlsx|pdf&<same filters as the page>
-// "expenses" exports the expense list with the /expenses filters.
+// "expenses" exports the expense list with the /expenses filters; "wage-sheet" takes ?month=YYYY-MM.
 export async function GET(request: Request, ctx: RouteContext<"/api/reports/[report]">) {
   const user = await getCurrentUser();
   if (!user) return new Response("Not logged in", { status: 401 });
@@ -22,10 +25,11 @@ export async function GET(request: Request, ctx: RouteContext<"/api/reports/[rep
 
   let report: Report;
   try {
-    report =
-      slug === "expenses"
-        ? await expenseListReport(user, parseExpenseFilters(sp))
-        : await buildReport(user, slug, parseReportFilters(sp, REPORTS[slug].defaultPeriod, todayPK()));
+    if (slug === "expenses") report = await expenseListReport(user, parseExpenseFilters(sp));
+    else if (slug === "wage-sheet") {
+      const employeeType = EMPLOYEE_TYPES.includes(sp.type as EmployeeType) ? (sp.type as EmployeeType) : undefined;
+      report = await wageSheetReport(user, parseMonth(sp.month) ?? todayPK().slice(0, 7), { employeeType, print: format === "pdf" });
+    } else report = await buildReport(user, slug, parseReportFilters(sp, REPORTS[slug].defaultPeriod, todayPK()));
   } catch (e) {
     if (e instanceof ForbiddenError) return new Response(e.message, { status: 403 });
     if (e instanceof NotFoundError) return new Response(e.message, { status: 404 });

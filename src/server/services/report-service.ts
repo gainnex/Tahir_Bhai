@@ -9,7 +9,7 @@ import {
   type Report,
   type ReportFilters,
   type ReportRow,
-  type ReportSlug,
+  type StandardReportSlug,
 } from "@/lib/reports";
 import { PAYMENT_MODE_LABELS, type ExpenseFilters } from "@/lib/validation/expenses";
 import { TRADE_LABELS, VENDOR_TYPE_LABELS } from "@/lib/validation/parties";
@@ -719,7 +719,7 @@ export async function expenseListReport(actor: Actor, filters: ExpenseFilters): 
 
 // ---------------------------------------------------------------------------
 
-export async function buildReport(actor: Actor, slug: Exclude<ReportSlug, "expenses">, f: ReportFilters): Promise<Report> {
+export async function buildReport(actor: Actor, slug: StandardReportSlug, f: ReportFilters): Promise<Report> {
   switch (slug) {
     case "project-cost-summary":
       return projectCostSummary(actor, f);

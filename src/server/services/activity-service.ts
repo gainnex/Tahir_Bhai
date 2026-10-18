@@ -12,6 +12,8 @@ export const ENTITY_TYPES = [
   "vendor",
   "worker",
   "cash_entry",
+  "attendance",
+  "pay_adjustment",
   "user",
   "expense_head",
   "expense_subhead",
@@ -125,25 +127,30 @@ export async function listActivity(actor: Actor, f: ActivityFilters) {
 
   // Human labels for the records the rows point at (expense numbers, project codes, …)
   const idsOf = (type: string) => [...new Set(rows.filter((r) => r.entityType === type).map((r) => r.entityId))];
-  const [expenses, projects, vendors, workers, users, heads, subheads, cashEntries] = await Promise.all([
+  const [expenses, projects, vendors, workers, users, heads, subheads, cashEntries, adjustments] = await Promise.all([
     db.expense.findMany({ where: { id: { in: idsOf("expense") } }, select: { id: true, expenseNo: true } }),
     db.project.findMany({ where: { id: { in: idsOf("project") } }, select: { id: true, code: true } }),
     db.vendor.findMany({ where: { id: { in: idsOf("vendor") } }, select: { id: true, name: true } }),
-    db.worker.findMany({ where: { id: { in: idsOf("worker") } }, select: { id: true, name: true } }),
+    // attendance is logged against the employee
+    db.worker.findMany({ where: { id: { in: [...idsOf("worker"), ...idsOf("attendance")] } }, select: { id: true, name: true } }),
     db.user.findMany({ where: { id: { in: idsOf("user") } }, select: { id: true, username: true } }),
     db.expenseHead.findMany({ where: { id: { in: idsOf("expense_head") } }, select: { id: true, name: true } }),
     db.expenseSubhead.findMany({ where: { id: { in: idsOf("expense_subhead") } }, select: { id: true, name: true } }),
     db.cashEntry.findMany({ where: { id: { in: idsOf("cash_entry") } }, select: { id: true, entryNo: true } }),
+    db.payAdjustment.findMany({ where: { id: { in: idsOf("pay_adjustment") } }, select: { id: true, entryNo: true } }),
   ]);
+  const workerNames = Object.fromEntries(workers.map((w) => [w.id, w.name]));
   const labels: Record<string, Record<number, string>> = {
     expense: Object.fromEntries(expenses.map((e) => [e.id, e.expenseNo])),
     project: Object.fromEntries(projects.map((p) => [p.id, p.code])),
     vendor: Object.fromEntries(vendors.map((v) => [v.id, v.name])),
-    worker: Object.fromEntries(workers.map((w) => [w.id, w.name])),
+    worker: workerNames,
+    attendance: workerNames,
     user: Object.fromEntries(users.map((u) => [u.id, `@${u.username}`])),
     expense_head: Object.fromEntries(heads.map((h) => [h.id, h.name])),
     expense_subhead: Object.fromEntries(subheads.map((s) => [s.id, s.name])),
     cash_entry: Object.fromEntries(cashEntries.map((c) => [c.id, c.entryNo])),
+    pay_adjustment: Object.fromEntries(adjustments.map((a) => [a.id, a.entryNo])),
   };
 
   const names = await namesForChanges(rows.map((r) => r.changes));
@@ -167,7 +174,10 @@ export function entityHref(entityType: string, entityId: number): string | null 
     case "vendor":
       return `/vendors/${entityId}`;
     case "worker":
+    case "attendance":
       return `/workers/${entityId}`;
+    case "pay_adjustment":
+      return `/payroll/adjustments/${entityId}/edit`;
     case "cash_entry":
       return `/cash/entry/${entityId}/edit`;
     case "user":

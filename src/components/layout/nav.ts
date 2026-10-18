@@ -33,6 +33,8 @@ export const NAV: NavSection[] = [
     icon: HardHat,
     children: [
       { label: "Employees & Workers", href: "/workers" },
+      { label: "Attendance", href: "/attendance" },
+      { label: "Wage Sheet", href: "/payroll", roles: PRIVILEGED },
       { label: "Labour Payment", href: "/labour-payment" },
       { label: "Cash in Hand", href: "/cash" },
     ],

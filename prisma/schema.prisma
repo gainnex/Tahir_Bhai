@@ -62,6 +62,25 @@ enum CashEntryType {
   RETURNED // unspent cash handed back to the company
 }
 
+// Office attendance (changes/changes.pdf §3). Unmarked days: unpaid for daily-rate workers,
+// paid for monthly staff.
+enum AttendanceStatus {
+  PRESENT
+  HALF_DAY
+  ABSENT
+  LEAVE
+}
+
+// Pay added to or taken off an employee's monthly wages (changes/changes.pdf §3:
+// "benefit / rewards, incentives, deductions and advance payments").
+enum PayAdjustmentType {
+  BENEFIT
+  REWARD
+  INCENTIVE
+  DEDUCTION
+  ADVANCE_RECOVERY // repays an advance (advances themselves are expenses under "Advance to labour")
+}
+
 enum PaymentMode {
   CASH
   ONLINE_TRANSFER
@@ -102,6 +121,8 @@ model User {
   projects         ProjectUser[]
   employee         Worker?
   cashEntries      CashEntry[]
+  attendanceMarked Attendance[]
+  payAdjustments   PayAdjustment[]
   expensesCreated  Expense[]     @relation("ExpenseCreatedBy")
   expensesApproved Expense[]     @relation("ExpenseApprovedBy")
   attachments      Attachment[]
@@ -219,6 +240,8 @@ model Worker {
   // Expenses this employee paid out of the cash they hold
   cashExpenses   Expense[]   @relation("ExpensePaidFrom")
   cashEntries    CashEntry[]
+  attendance     Attendance[]
+  payAdjustments PayAdjustment[]
 
   @@map("workers")
 }
@@ -299,6 +322,44 @@ model CashEntry {
 
   @@index([workerId, date])
   @@map("cash_entries")
+}
+
+// One row per employee per day; clearing a mark deletes the row (changes are in the activity log).
+model Attendance {
+  id         Int              @id @default(autoincrement())
+  date       DateTime         @db.Date
+  workerId   Int              @map("worker_id")
+  status     AttendanceStatus
+  markedById Int              @map("marked_by")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  worker   Worker @relation(fields: [workerId], references: [id])
+  markedBy User   @relation(fields: [markedById], references: [id])
+
+  @@unique([workerId, date])
+  @@index([date])
+  @@map("attendance")
+}
+
+model PayAdjustment {
+  id          Int               @id @default(autoincrement())
+  entryNo     String            @unique @map("entry_no")
+  date        DateTime          @db.Date
+  workerId    Int               @map("worker_id")
+  type        PayAdjustmentType
+  amount      Decimal           @db.Decimal(14, 2)
+  notes       String?
+  createdById Int               @map("created_by")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  deletedAt   DateTime?         @map("deleted_at")
+
+  worker    Worker @relation(fields: [workerId], references: [id])
+  createdBy User   @relation(fields: [createdById], references: [id])
+
+  @@index([workerId, date])
+  @@map("pay_adjustments")
 }
 
 model Attachment {

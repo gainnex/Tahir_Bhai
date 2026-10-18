@@ -24,6 +24,10 @@ export const can = {
   manageWorkers: (r: Role) => PRIVILEGED.includes(r),
   /** Give / take back employees' cash in hand and see every employee's balance */
   manageCash: (r: Role) => PRIVILEGED.includes(r),
+  /** Wage sheet, benefits / rewards / incentives / deductions */
+  managePayroll: (r: Role) => PRIVILEGED.includes(r),
+  /** Mark everyone's attendance; site in-charges only employees of their assigned projects */
+  markAllAttendance: (r: Role) => PRIVILEGED.includes(r),
   /** Sees every project; site in-charges only see projects assigned to them */
   seeAllProjects: (r: Role) => PRIVILEGED.includes(r),
 };
@@ -38,6 +42,7 @@ export const ROUTE_ROLES: [prefix: string, roles: Role[]][] = [
   ["/workers/new", PRIVILEGED],
   ["/cash/new", PRIVILEGED],
   ["/cash/entry", PRIVILEGED],
+  ["/payroll", PRIVILEGED],
 ];
 
 export function isRouteAllowed(pathname: string, role: Role): boolean {

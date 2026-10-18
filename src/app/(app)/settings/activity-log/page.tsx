@@ -28,6 +28,8 @@ const ENTITY_LABEL: Record<EntityType, string> = {
   vendor: "Vendor",
   worker: "Employee / worker",
   cash_entry: "Cash entry",
+  attendance: "Attendance",
+  pay_adjustment: "Pay adjustment",
   user: "User",
   expense_head: "Expense head",
   expense_subhead: "Sub-head",
