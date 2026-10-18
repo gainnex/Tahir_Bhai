@@ -11,7 +11,7 @@ export const metadata = { title: "New expense" };
 
 export default async function NewExpensePage({ searchParams }: PageProps<"/expenses/new">) {
   const actor = await requireUser();
-  const { projectId } = await searchParams;
+  const { projectId, paidFromId } = await searchParams;
   const [options, settings] = await Promise.all([getExpenseFormOptions(actor), getSettings()]);
 
   return (
@@ -31,7 +31,10 @@ export default async function NewExpensePage({ searchParams }: PageProps<"/expen
           mode="expense"
           action={createExpenseAction}
           options={options}
-          defaults={{ projectId: typeof projectId === "string" ? Number(projectId) : undefined }}
+          defaults={{
+            projectId: typeof projectId === "string" ? Number(projectId) : undefined,
+            paidFromId: typeof paidFromId === "string" ? Number(paidFromId) : undefined,
+          }}
           today={todayPK()}
           currency={settings.currencyLabel}
           cancelHref="/expenses"

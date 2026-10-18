@@ -19,7 +19,7 @@ export default async function EditExpensePage({ params }: PageProps<"/expenses/[
   if (!canEditExpense(actor, e)) redirect(`/expenses/${id}`);
 
   const [options, settings] = await Promise.all([
-    getExpenseFormOptions(actor, { projectId: e.projectId, headId: e.headId, subheadId: e.subheadId, workerId: e.workerId }),
+    getExpenseFormOptions(actor, { projectId: e.projectId, headId: e.headId, subheadId: e.subheadId, workerId: e.workerId, paidFromId: e.paidFromId }),
     getSettings(),
   ]);
 
@@ -57,6 +57,7 @@ export default async function EditExpensePage({ params }: PageProps<"/expenses/[
           paidTo: e.paidTo,
           vendorId: e.vendorId,
           workerId: e.workerId,
+          paidFromId: e.paidFromId,
           referenceNo: e.referenceNo ?? "",
           description: e.description,
         }}

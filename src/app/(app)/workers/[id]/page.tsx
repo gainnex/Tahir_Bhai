@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Clock, Filter, HandCoins, Pencil, Plus, Wallet, Banknote } from "lucide-react";
+import { ArrowRight, Banknote, Clock, Filter, HandCoins, Pencil, PiggyBank, Plus, Wallet } from "lucide-react";
 import { ExpenseMiniTable } from "@/components/expense-mini-table";
 import { Kpi } from "@/components/kpi";
 import { PageHeader } from "@/components/layout/page-header";
@@ -9,14 +9,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import { formatPKR, plural, rateLabel } from "@/lib/format";
 import { can } from "@/lib/permissions";
-import { RATE_TYPE_LABELS, TRADE_LABELS } from "@/lib/validation/parties";
+import { EMPLOYEE_TYPE_LABELS, RATE_TYPE_LABELS, TRADE_LABELS } from "@/lib/validation/parties";
 import { requireUser } from "@/server/auth";
 import { pageData, parseId } from "@/server/params";
+import { cashBalances } from "@/server/services/cash-service";
 import { getSettings } from "@/server/services/settings-service";
 import { getWorkerProfile } from "@/server/services/worker-service";
 import { ProjectTotalsTable, type ProjectTotalRow } from "./project-totals-table";
 
-export const metadata = { title: "Worker" };
+export const metadata = { title: "Employee" };
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -36,6 +37,9 @@ export default async function WorkerProfilePage({ params, searchParams }: PagePr
   const [p, settings] = await Promise.all([pageData(getWorkerProfile(actor, id, { projectId })), getSettings()]);
   const { worker } = p;
   const cur = settings.currencyLabel;
+  // Cash in hand: Admin/Accountant, or the employee themself via their linked login
+  const seesCash = can.manageCash(actor.role) || worker.userId === actor.id;
+  const cash = seesCash ? (await cashBalances([worker.id])).get(worker.id) : undefined;
   const none = <span className="text-muted-foreground">—</span>;
 
   const projectRows: ProjectTotalRow[] = p.byProject.map((r) => ({
@@ -57,6 +61,7 @@ export default async function WorkerProfilePage({ params, searchParams }: PagePr
           </span>
         }
         description={[
+          worker.designation ?? EMPLOYEE_TYPE_LABELS[worker.employeeType],
           TRADE_LABELS[worker.trade],
           rateLabel(worker.rate, worker.rateType, cur),
           worker.cnic && `CNIC ${worker.cnic}`,
@@ -117,12 +122,49 @@ export default async function WorkerProfilePage({ params, searchParams }: PagePr
         />
       </div>
 
+      {seesCash && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PiggyBank className="size-4 text-muted-foreground" /> Cash in hand
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <div
+                className={`font-mono text-2xl font-semibold tabular-nums ${cash?.balance.isNegative() ? "text-destructive" : ""}`}
+              >
+                {formatPKR(cash?.balance.abs() ?? 0, cur)}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {cash?.balance.isNegative()
+                  ? "The company owes this employee (spent more than they were given)."
+                  : "Money given to this employee and not yet spent or returned."}
+                {cash && cash.pendingCount > 0 && ` ${formatPKR(cash.pendingSpent, cur)} of spending awaits approval.`}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {can.manageCash(actor.role) && worker.isActive && (
+                <Link href={`/cash/new?workerId=${worker.id}`} className={buttonVariants({ variant: "outline" })}>
+                  <Plus /> Give funds
+                </Link>
+              )}
+              <Link href={`/cash/${worker.id}`} className={buttonVariants({ variant: "secondary" })}>
+                Cash statement <ArrowRight />
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="mt-6">
         <CardHeader>
           <CardTitle>Contact &amp; payment details</CardTitle>
         </CardHeader>
         <CardContent>
           <dl>
+            <Row label="Type">{EMPLOYEE_TYPE_LABELS[worker.employeeType]}</Row>
+            <Row label="Designation">{worker.designation ?? none}</Row>
             <Row label="Trade">{TRADE_LABELS[worker.trade]}</Row>
             <Row label="Rate">
               <span className="font-mono tabular-nums">{rateLabel(worker.rate, worker.rateType, cur)}</span>{" "}
@@ -140,6 +182,11 @@ export default async function WorkerProfilePage({ params, searchParams }: PagePr
                 none
               )}
             </Row>
+            {can.manageWorkers(actor.role) && (
+              <Row label="Login account">
+                {worker.user ? <span className="font-mono">@{worker.user.username}</span> : none}
+              </Row>
+            )}
             <Row label="Status">
               <ActiveBadge active={worker.isActive} />
             </Row>

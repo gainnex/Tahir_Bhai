@@ -42,6 +42,7 @@ export type ExpenseFormValues = {
   paidTo: string;
   vendorId: number | null;
   workerId: number | null;
+  paidFromId: number | null;
   referenceNo: string;
   description: string;
 };
@@ -60,6 +61,7 @@ type FormValues = {
   chequeNo: string;
   vendorId: string;
   workerId: string;
+  paidFromId: string;
   paidTo: string;
   referenceNo: string;
   description: string;
@@ -72,7 +74,7 @@ type Props = {
   options: ExpenseFormOptions;
   values?: ExpenseFormValues; // edit
   attachments?: { id: number; fileName: string; mimeType: string }[];
-  defaults?: { projectId?: number; workerId?: number };
+  defaults?: { projectId?: number; workerId?: number; paidFromId?: number };
   today: string; // YYYY-MM-DD in Pakistan time
   currency: string;
   cancelHref: string;
@@ -121,6 +123,14 @@ export function ExpenseForm({ mode, action, options, values, attachments = [], d
       chequeNo: values?.chequeNo ?? "",
       vendorId: String(values?.vendorId ?? ""),
       workerId: String(startWorker ?? ""),
+      // New entries by an employee with a linked login default to their own cash in hand
+      paidFromId: String(
+        (isEdit
+          ? values?.paidFromId
+          : options.cashHolders.some((h) => h.id === defaults?.paidFromId)
+            ? defaults?.paidFromId
+            : options.ownEmployeeId) ?? "",
+      ),
       paidTo: values?.paidTo ?? (startWorker ? workerById.get(startWorker)?.name ?? "" : ""),
       referenceNo: values?.referenceNo ?? "",
       description: values?.description ?? "",
@@ -156,6 +166,10 @@ export function ExpenseForm({ mode, action, options, values, attachments = [], d
   const vendorOptions: ComboboxOption[] = options.vendors.map((v) => ({ value: String(v.id), label: v.name }));
   const workerOptions: ComboboxOption[] = options.workers.map((w) => ({ value: String(w.id), label: w.name }));
   const modeOptions: ComboboxOption[] = PAYMENT_MODES.map((m) => ({ value: m, label: PAYMENT_MODE_LABELS[m] }));
+  const cashHolderOptions: ComboboxOption[] = options.cashHolders.map((w) => ({
+    value: String(w.id),
+    label: w.id === options.ownEmployeeId ? `${w.name} (my cash in hand)` : w.name,
+  }));
 
   // ---- Linked-field behaviour (unchanged from the native form) ----
   function recalc(q: string, r: string, rateType = worker?.rateType) {
@@ -350,6 +364,20 @@ export function ExpenseForm({ mode, action, options, values, attachments = [], d
             <TextField name="chequeNo" label="Cheque number" required inputClassName={cn(big, "font-mono")} />
           ) : (
             <div className="hidden sm:block" />
+          )}
+
+          {cashHolderOptions.length > 0 && (
+            <ComboboxField
+              name="paidFromId"
+              label="Paid from"
+              description="Pick an employee when they paid out of the cash they hold; it comes off their balance."
+              className="sm:col-span-2"
+              options={cashHolderOptions}
+              clearLabel="Company (paid directly)"
+              placeholder="Company (paid directly)"
+              searchPlaceholder="Search employees…"
+              triggerClassName={big}
+            />
           )}
 
           {mode === "expense" && (

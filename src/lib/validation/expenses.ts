@@ -31,6 +31,8 @@ const common = {
   paidTo: requiredText("Paid to", 150),
   vendorId: optionalId,
   workerId: optionalId,
+  /** Employee whose cash in hand paid this; null = paid by the company directly */
+  paidFromId: optionalId,
   referenceNo: optionalText(100),
   description: requiredText("Description", 1000),
 };
@@ -107,6 +109,7 @@ export const expenseFiltersSchema = z.object({
   subheadId: optionalPositiveInt,
   vendorId: optionalPositiveInt,
   workerId: optionalPositiveInt,
+  paidFromId: optionalPositiveInt,
   createdById: optionalPositiveInt,
   status: z.preprocess((v) => (EXPENSE_STATUSES.includes(v as ExpenseStatus) ? v : undefined), z.enum(EXPENSE_STATUSES).optional()),
   paymentMode: z.preprocess((v) => (PAYMENT_MODES.includes(v as PaymentMode) ? v : undefined), z.enum(PAYMENT_MODES).optional()),

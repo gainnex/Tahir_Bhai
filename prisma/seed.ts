@@ -196,6 +196,46 @@ async function seedSampleData(adminId: number) {
     ),
   );
 
+  // Staff (payroll employees). The two site in-charges' logins are linked to their employee
+  // records, so the site expenses they enter are paid from their cash in hand.
+  const [imran, asif] = await Promise.all([
+    prisma.worker.create({
+      data: {
+        name: site1.name, employeeType: "PERMANENT", designation: "Site supervisor", trade: "OTHER",
+        rateType: "MONTHLY", rate: D(85_000), defaultProjectId: p1.id, userId: site1.id, phone: "0301-5550101",
+      },
+    }),
+    prisma.worker.create({
+      data: {
+        name: site2.name, employeeType: "PERMANENT", designation: "Site supervisor", trade: "OTHER",
+        rateType: "MONTHLY", rate: D(80_000), defaultProjectId: p2.id, userId: site2.id, phone: "0302-5550202",
+      },
+    }),
+    prisma.worker.create({
+      data: {
+        name: "Sana Tariq", employeeType: "PART_TIME", designation: "Office assistant", trade: "OTHER",
+        rateType: "MONTHLY", rate: D(35_000), defaultProjectId: headOffice.id,
+      },
+    }),
+  ]);
+  const cashHolderOf = new Map([
+    [site1.id, imran.id],
+    [site2.id, asif.id],
+  ]);
+  let cashSeq = 0;
+  const cash = (workerId: number, date: string, type: "OPENING" | "ISSUED" | "RETURNED", amount: number, mode: PaymentMode, notes: string, projectId?: number) =>
+    prisma.cashEntry.create({
+      data: {
+        entryNo: `CSH-2026-${String(++cashSeq).padStart(5, "0")}`,
+        date: day(date), workerId, type, amount: D(amount), paymentMode: mode, projectId, notes, createdById: accountant.id,
+      },
+    });
+  await cash(imran.id, "2026-09-01", "OPENING", 15_000, "CASH", "Cash in hand when the system started");
+  await cash(imran.id, "2026-09-02", "ISSUED", 100_000, "ONLINE_TRANSFER", "Site imprest September", p1.id);
+  await cash(imran.id, "2026-10-01", "ISSUED", 50_000, "CASH", "Site imprest October", p1.id);
+  await cash(asif.id, "2026-09-03", "ISSUED", 35_000, "ONLINE_TRANSFER", "Site imprest", p2.id);
+  await cash(asif.id, "2026-09-30", "RETURNED", 5_000, "CASH", "Unspent cash returned");
+
   const heads = await prisma.expenseHead.findMany({ include: { subheads: true } });
   const head = (name: string) => heads.find((h) => h.name === name)!;
   const sub = (headName: string, subName: string) =>
@@ -223,6 +263,8 @@ async function seedSampleData(adminId: number) {
     const status = r.status ?? "APPROVED";
     const mode = r.mode ?? "CASH";
     const createdById = r.createdById ?? accountant.id;
+    // Site running costs entered by a site in-charge from September on came out of their cash in hand
+    const paidFromId = r.date >= "2026-09-01" && r.head !== LABOUR_HEAD ? cashHolderOf.get(createdById) : undefined;
     await prisma.expense.create({
       data: {
         expenseNo: `EXP-2026-${String(seq).padStart(5, "0")}`,
@@ -236,6 +278,7 @@ async function seedSampleData(adminId: number) {
         paidTo: r.paidTo,
         vendorId: r.vendorId,
         workerId: r.workerId,
+        paidFromId,
         description: r.description,
         status,
         rejectionReason: status === "REJECTED" ? r.rejectionReason ?? "Receipt missing" : null,
@@ -351,7 +394,9 @@ async function seedSampleData(adminId: number) {
     status: "REJECTED", rejectionReason: "Rate not agreed — please attach quotation",
   });
 
-  console.log(`Sample data: 4 projects, ${vendors.length} vendors, ${workers.length} workers, ${seq} expenses.`);
+  console.log(
+    `Sample data: 4 projects, ${vendors.length} vendors, ${workers.length} workers + 3 staff, ${seq} expenses, ${cashSeq} cash entries.`,
+  );
   console.log("Sample logins (password: password123): accountant, site1, site2");
 }
 

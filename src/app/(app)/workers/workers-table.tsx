@@ -9,11 +9,21 @@ import { RowActions, type RowAction } from "@/components/data-table/row-actions"
 import { ActiveBadge } from "@/components/status-badges";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatAmount, rateLabel } from "@/lib/format";
-import { TRADE_LABELS, TRADES, type RateType, type Trade } from "@/lib/validation/parties";
+import {
+  EMPLOYEE_TYPE_LABELS,
+  EMPLOYEE_TYPES,
+  TRADE_LABELS,
+  TRADES,
+  type EmployeeType,
+  type RateType,
+  type Trade,
+} from "@/lib/validation/parties";
 
 export type WorkerListRow = {
   id: number;
   name: string;
+  employeeType: EmployeeType;
+  designation: string;
   trade: Trade;
   rate: string; // decimal string
   rateType: RateType;
@@ -46,10 +56,25 @@ export function WorkersTable({
       ),
     },
     {
+      accessorKey: "employeeType",
+      filterFn: "arrIncludesSome",
+      header: ({ column }) => <SortHeader column={column} title="Type" />,
+      cell: ({ row }) => (
+        <span>
+          {EMPLOYEE_TYPE_LABELS[row.original.employeeType]}
+          <span className="block text-xs text-muted-foreground">
+            {row.original.designation || (row.original.employeeType === "LABOUR" ? TRADE_LABELS[row.original.trade] : "")}
+          </span>
+        </span>
+      ),
+    },
+    {
       accessorKey: "trade",
       filterFn: "arrIncludesSome",
       header: ({ column }) => <SortHeader column={column} title="Trade" />,
       cell: ({ row }) => TRADE_LABELS[row.original.trade],
+      // Shown under the type on narrower screens
+      meta: { className: "hidden 2xl:table-cell" },
     },
     {
       accessorKey: "rate",
@@ -63,7 +88,7 @@ export function WorkersTable({
       enableSorting: false,
       header: "CNIC",
       cell: ({ row }) => <span className="font-mono text-[13px] tabular-nums">{row.original.cnic}</span>,
-      meta: { className: "hidden lg:table-cell" },
+      meta: { className: "hidden 2xl:table-cell" },
     },
     {
       accessorKey: "defaultProjectCode",
@@ -119,6 +144,11 @@ export function WorkersTable({
       data={rows}
       emptyText={emptyText}
       facets={[
+        {
+          columnId: "employeeType",
+          title: "Type",
+          options: EMPLOYEE_TYPES.map((t) => ({ value: t, label: EMPLOYEE_TYPE_LABELS[t] })),
+        },
         { columnId: "trade", title: "Trade", options: TRADES.map((t) => ({ value: t, label: TRADE_LABELS[t] })) },
         {
           columnId: "status",

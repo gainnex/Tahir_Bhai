@@ -52,6 +52,7 @@ function input(extra: Partial<ExpenseInput> = {}): ExpenseInput {
     paidTo: "Shop",
     vendorId: null,
     workerId: null,
+    paidFromId: null,
     referenceNo: null,
     description: "Test",
     ...extra,

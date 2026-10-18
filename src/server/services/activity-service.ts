@@ -11,6 +11,7 @@ export const ENTITY_TYPES = [
   "project",
   "vendor",
   "worker",
+  "cash_entry",
   "user",
   "expense_head",
   "expense_subhead",
@@ -33,7 +34,18 @@ export const ACTIVITY_PAGE_SIZE = 50;
 /** Map of field -> id -> display name, so logged ids read as names. */
 export type NameMaps = Record<string, Record<number, string>>;
 
-const ID_FIELDS = ["projectId", "headId", "subheadId", "vendorId", "workerId", "approvedById", "defaultProjectId", "siteInchargeIds"];
+const ID_FIELDS = [
+  "projectId",
+  "headId",
+  "subheadId",
+  "vendorId",
+  "workerId",
+  "paidFromId",
+  "approvedById",
+  "defaultProjectId",
+  "siteInchargeIds",
+  "userId",
+];
 
 function collectIds(changes: unknown, into: Record<string, Set<number>>) {
   if (!changes || typeof changes !== "object") return;
@@ -53,13 +65,14 @@ function collectIds(changes: unknown, into: Record<string, Set<number>>) {
 async function resolveNames(ids: Record<string, Set<number>>): Promise<NameMaps> {
   const list = (k: string) => [...(ids[k] ?? [])];
   const projectIds = [...list("projectId"), ...list("defaultProjectId")];
-  const userIds = [...list("approvedById"), ...list("siteInchargeIds")];
+  const userIds = [...list("approvedById"), ...list("siteInchargeIds"), ...list("userId")];
+  const workerIds = [...list("workerId"), ...list("paidFromId")];
   const [projects, heads, subheads, vendors, workers, users] = await Promise.all([
     projectIds.length ? db.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, code: true, name: true } }) : [],
     list("headId").length ? db.expenseHead.findMany({ where: { id: { in: list("headId") } }, select: { id: true, name: true } }) : [],
     list("subheadId").length ? db.expenseSubhead.findMany({ where: { id: { in: list("subheadId") } }, select: { id: true, name: true } }) : [],
     list("vendorId").length ? db.vendor.findMany({ where: { id: { in: list("vendorId") } }, select: { id: true, name: true } }) : [],
-    list("workerId").length ? db.worker.findMany({ where: { id: { in: list("workerId") } }, select: { id: true, name: true } }) : [],
+    workerIds.length ? db.worker.findMany({ where: { id: { in: workerIds } }, select: { id: true, name: true } }) : [],
     userIds.length ? db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } }) : [],
   ]);
   const toMap = (rows: { id: number; name: string; code?: string }[]) =>
@@ -73,7 +86,9 @@ async function resolveNames(ids: Record<string, Set<number>>): Promise<NameMaps>
     subheadId: toMap(subheads),
     vendorId: toMap(vendors),
     workerId: toMap(workers),
+    paidFromId: toMap(workers),
     approvedById: userMap,
+    userId: userMap,
     siteInchargeIds: userMap,
   };
 }
@@ -110,7 +125,7 @@ export async function listActivity(actor: Actor, f: ActivityFilters) {
 
   // Human labels for the records the rows point at (expense numbers, project codes, …)
   const idsOf = (type: string) => [...new Set(rows.filter((r) => r.entityType === type).map((r) => r.entityId))];
-  const [expenses, projects, vendors, workers, users, heads, subheads] = await Promise.all([
+  const [expenses, projects, vendors, workers, users, heads, subheads, cashEntries] = await Promise.all([
     db.expense.findMany({ where: { id: { in: idsOf("expense") } }, select: { id: true, expenseNo: true } }),
     db.project.findMany({ where: { id: { in: idsOf("project") } }, select: { id: true, code: true } }),
     db.vendor.findMany({ where: { id: { in: idsOf("vendor") } }, select: { id: true, name: true } }),
@@ -118,6 +133,7 @@ export async function listActivity(actor: Actor, f: ActivityFilters) {
     db.user.findMany({ where: { id: { in: idsOf("user") } }, select: { id: true, username: true } }),
     db.expenseHead.findMany({ where: { id: { in: idsOf("expense_head") } }, select: { id: true, name: true } }),
     db.expenseSubhead.findMany({ where: { id: { in: idsOf("expense_subhead") } }, select: { id: true, name: true } }),
+    db.cashEntry.findMany({ where: { id: { in: idsOf("cash_entry") } }, select: { id: true, entryNo: true } }),
   ]);
   const labels: Record<string, Record<number, string>> = {
     expense: Object.fromEntries(expenses.map((e) => [e.id, e.expenseNo])),
@@ -127,6 +143,7 @@ export async function listActivity(actor: Actor, f: ActivityFilters) {
     user: Object.fromEntries(users.map((u) => [u.id, `@${u.username}`])),
     expense_head: Object.fromEntries(heads.map((h) => [h.id, h.name])),
     expense_subhead: Object.fromEntries(subheads.map((s) => [s.id, s.name])),
+    cash_entry: Object.fromEntries(cashEntries.map((c) => [c.id, c.entryNo])),
   };
 
   const names = await namesForChanges(rows.map((r) => r.changes));
@@ -151,6 +168,8 @@ export function entityHref(entityType: string, entityId: number): string | null 
       return `/vendors/${entityId}`;
     case "worker":
       return `/workers/${entityId}`;
+    case "cash_entry":
+      return `/cash/entry/${entityId}/edit`;
     case "user":
       return `/settings/users/${entityId}`;
     case "expense_head":

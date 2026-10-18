@@ -56,6 +56,7 @@ function filterWhere(actor: Actor, f: Partial<ExpenseFilters>): Prisma.ExpenseWh
   if (f.subheadId) and.push({ subheadId: f.subheadId });
   if (f.vendorId) and.push({ vendorId: f.vendorId });
   if (f.workerId) and.push({ workerId: f.workerId });
+  if (f.paidFromId) and.push({ paidFromId: f.paidFromId });
   if (f.createdById) and.push({ createdById: f.createdById });
   if (f.status) and.push({ status: f.status });
   if (f.paymentMode) and.push({ paymentMode: f.paymentMode });
@@ -127,6 +128,7 @@ export async function getExpenseDetail(actor: Actor, id: number) {
       subhead: { select: { id: true, name: true } },
       vendor: { select: { id: true, name: true } },
       worker: { select: { id: true, name: true } },
+      paidFrom: { select: { id: true, name: true, userId: true } },
       createdBy: { select: { id: true, name: true } },
       approvedBy: { select: { id: true, name: true } },
       attachments: { orderBy: { id: "asc" } },
@@ -186,9 +188,9 @@ export async function getAttachment(actor: Actor, attachmentId: number) {
  */
 export async function getExpenseFormOptions(
   actor: Actor,
-  current?: { projectId: number; headId: number; subheadId: number; workerId: number | null },
+  current?: { projectId: number; headId: number; subheadId: number; workerId: number | null; paidFromId?: number | null },
 ) {
-  const [projects, heads, vendors, workers] = await Promise.all([
+  const [projects, heads, vendors, workers, cashHolders, ownEmployee] = await Promise.all([
     db.project.findMany({
       where: {
         AND: [
@@ -219,13 +221,37 @@ export async function getExpenseFormOptions(
       select: { id: true, name: true, rate: true, rateType: true, defaultProjectId: true },
       orderBy: { name: "asc" },
     }),
+    cashHolderOptions(actor, current?.paidFromId ?? null),
+    ownEmployeeId(actor.id),
   ]);
   return {
     projects,
     heads,
     vendors,
     workers: workers.map((w) => ({ ...w, rate: w.rate.toFixed(2) })),
+    cashHolders,
+    /** Pre-selected "paid from" for a new expense entered by an employee with a login */
+    ownEmployeeId: ownEmployee,
   };
+}
+
+/** The employee record linked to a login, if any. */
+export async function ownEmployeeId(userId: number) {
+  const w = await db.worker.findFirst({ where: { userId, deletedAt: null }, select: { id: true } });
+  return w?.id ?? null;
+}
+
+/**
+ * Who an expense may be "paid from". Admin/Accountant: any active employee. Everyone else:
+ * only their own linked employee record (they spend their own cash in hand).
+ */
+async function cashHolderOptions(actor: Actor, currentId: number | null) {
+  const own = can.manageCash(actor.role) ? {} : { userId: actor.id };
+  return db.worker.findMany({
+    where: { deletedAt: null, OR: [{ isActive: true, ...own }, ...(currentId ? [{ id: currentId }] : [])] },
+    select: { id: true, name: true, employeeType: true },
+    orderBy: [{ name: "asc" }],
+  });
 }
 export type ExpenseFormOptions = Awaited<ReturnType<typeof getExpenseFormOptions>>;
 
@@ -255,6 +281,15 @@ async function validateAllocation(actor: Actor, a: Allocation, existing?: Alloca
     if (!subhead.isActive) throw new AppError(`The sub-head "${subhead.name}" is disabled and cannot be used.`);
   }
   return { project, head, subhead };
+}
+
+async function validatePaidFrom(actor: Actor, paidFromId: number | null, existingId?: number | null) {
+  if (!paidFromId || paidFromId === existingId) return;
+  const w = await db.worker.findFirst({ where: { id: paidFromId, deletedAt: null } });
+  if (!w || !w.isActive) throw new AppError("The selected employee for \"Paid from\" does not exist or is inactive.");
+  if (!can.manageCash(actor.role) && w.userId !== actor.id) {
+    throw new ForbiddenError("You can only record expenses paid from your own cash in hand.");
+  }
 }
 
 async function validateParties(vendorId: number | null, workerId: number | null) {
@@ -322,6 +357,7 @@ export async function createExpenses(actor: Actor, input: CreateExpenseInput, fi
   }
   if (input.kind === "labour" && !d.workerId) throw new AppError("Select a worker.");
   await validateParties(d.vendorId, d.workerId);
+  await validatePaidFrom(actor, d.paidFromId);
   if (files.length > MAX_ATTACHMENTS) throw new AppError(`You can attach at most ${MAX_ATTACHMENTS} files.`);
 
   const settings = await getSettings();
@@ -346,6 +382,7 @@ export async function createExpenses(actor: Actor, input: CreateExpenseInput, fi
             paidTo: d.paidTo,
             vendorId: d.vendorId,
             workerId: d.workerId,
+            paidFromId: d.paidFromId,
             referenceNo: d.referenceNo,
             description: d.description,
             status,
@@ -402,6 +439,7 @@ export async function updateExpense(
   }
   await validateAllocation(actor, data, existing);
   await validateParties(data.vendorId, data.workerId);
+  await validatePaidFrom(actor, data.paidFromId, existing.paidFromId);
 
   const newFiles = opts.newFiles ?? [];
   const removeIds = (opts.removeAttachmentIds ?? []).filter((aid) => existing.attachments.some((a) => a.id === aid));
@@ -427,6 +465,7 @@ export async function updateExpense(
     paidTo: data.paidTo,
     vendorId: data.vendorId,
     workerId: data.workerId,
+    paidFromId: data.paidFromId,
     referenceNo: data.referenceNo,
     description: data.description,
   };

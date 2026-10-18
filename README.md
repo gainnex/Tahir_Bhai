@@ -15,7 +15,11 @@ The full specification is in [`docs/`](docs/README.md) (features, database, scre
   filtered total, Excel/PDF export.
 - **Approval**: Pending → Approved / Rejected (reason required). Approved entries are locked
   (only Admin can edit, always logged). Optional auto-approve for Admin/Accountant entries.
-- **Vendors** and a **labour register** with labour payments (days × rate helper) and advances.
+- **Vendors** and an **employee register** (labour, permanent and part-time staff) with labour
+  payments (days × rate helper) and advances.
+- **Cash in hand** per employee: opening balance, funds given (cash / online transfer), cash
+  returned, and expenses marked *Paid from* that employee. Running-balance statement per employee;
+  an employee whose login is linked sees their own.
 - **Dashboard** and **5 reports** (Project Cost Summary, Expense Head, Project Ledger, Labour
   Payments, Vendors) with Excel and PDF export (company name, address and logo on the PDF).
 - **Users & roles**: Admin, Accountant, Site In-charge (sees and enters only for assigned projects).
@@ -150,6 +154,10 @@ Other decisions made during the build:
 - Labour advances are expenses with sub-head **"Advance to labour"** under **"Labour"** —
   keep those names if you rename things.
 - Expense numbers `EXP-YYYY-NNNNN` restart each year and are never reused.
+- Cash in hand (`cash-service.ts`): balance = opening + given − returned − **approved** expenses
+  paid from it. Only Admin / Accountant record cash entries (`CSH-YYYY-NNNNN`). A Site In-charge can
+  only mark expenses as paid from their **own** cash (their login linked on the employee record).
+  A negative balance means the company owes the employee.
 
 ---
 

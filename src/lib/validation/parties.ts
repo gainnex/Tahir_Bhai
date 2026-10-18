@@ -59,6 +59,14 @@ export const TRADE_LABELS: Record<Trade, string> = {
   OTHER: "Other",
 };
 
+export const EMPLOYEE_TYPES = ["LABOUR", "PERMANENT", "PART_TIME"] as const;
+export type EmployeeType = (typeof EMPLOYEE_TYPES)[number];
+export const EMPLOYEE_TYPE_LABELS: Record<EmployeeType, string> = {
+  LABOUR: "Labour",
+  PERMANENT: "Permanent staff",
+  PART_TIME: "Part-time staff",
+};
+
 export const RATE_TYPES = ["DAILY", "MONTHLY"] as const;
 export type RateType = (typeof RATE_TYPES)[number];
 export const RATE_TYPE_LABELS: Record<RateType, string> = { DAILY: "Daily", MONTHLY: "Monthly" };
@@ -72,10 +80,13 @@ export const workerSchema = z.object({
     .transform((v) => (v ? v : null))
     .refine((v) => v === null || /^\d{5}-\d{7}-\d$/.test(v), "CNIC format is 12345-1234567-1"),
   phone,
+  employeeType: z.enum(EMPLOYEE_TYPES, { error: "Select a type" }).default("LABOUR"),
+  designation: optionalText(100),
   trade: z.enum(TRADES, { error: "Select a trade" }),
   rateType: z.enum(RATE_TYPES, { error: "Select a rate type" }),
   rate: moneyString("Rate"),
   defaultProjectId: optionalId,
+  userId: optionalId,
   isActive: checkbox,
 });
 export type WorkerInput = z.output<typeof workerSchema>;

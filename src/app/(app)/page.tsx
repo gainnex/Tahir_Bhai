@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CalendarDays, CalendarRange, Clock, Plus, TriangleAlert } from "lucide-react";
+import { ArrowRight, CalendarDays, CalendarRange, Clock, PiggyBank, Plus, TriangleAlert } from "lucide-react";
 import { BudgetBar } from "@/components/budget-bar";
 import { AmountBarChart } from "@/components/charts/amount-bar-chart";
 import { ExpenseMiniTable } from "@/components/expense-mini-table";
@@ -14,6 +14,7 @@ import { formatAmount, formatPKR, plural } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { requireUser } from "@/server/auth";
+import { totalCashWithEmployees } from "@/server/services/cash-service";
 import { getDashboard, type DashboardPeriod } from "@/server/services/dashboard-service";
 import { getSettings } from "@/server/services/settings-service";
 
@@ -29,7 +30,12 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
   const actor = await requireUser();
   const sp = await searchParams;
   const period = (PERIODS.find((p) => p.key === sp.period)?.key ?? "year") as DashboardPeriod;
-  const [d, settings] = await Promise.all([getDashboard(actor, period), getSettings()]);
+  const showCash = can.manageCash(actor.role);
+  const [d, settings, cash] = await Promise.all([
+    getDashboard(actor, period),
+    getSettings(),
+    showCash ? totalCashWithEmployees() : null,
+  ]);
   const cur = settings.currencyLabel;
   const periodLabel = PERIODS.find((p) => p.key === period)!.label.toLowerCase();
   const pendingHref = can.approveExpenses(actor.role) ? "/expenses/pending" : "/expenses?status=PENDING";
@@ -56,7 +62,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
         </Notice>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className={cn("grid gap-4 sm:grid-cols-3", cash && "sm:grid-cols-2 lg:grid-cols-4")}>
         <Kpi
           label="Spent"
           period="This month"
@@ -88,6 +94,28 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
             sub={`${formatPKR(d.pendingAmount, cur)} waiting — not in totals yet`}
           />
         </Link>
+        {cash && (
+          <Link
+            href="/cash"
+            className="group block rounded-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <Kpi
+              label="Cash with employees"
+              icon={PiggyBank}
+              value={
+                <span className="flex items-center gap-2">
+                  {formatPKR(cash.held, cur)}
+                  <ArrowRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5" />
+                </span>
+              }
+              sub={
+                cash.owedCount
+                  ? `${formatPKR(cash.owed, cur)} owed to ${plural(cash.owedCount, "employee")}`
+                  : `Held by ${plural(cash.heldCount, "employee")}`
+              }
+            />
+          </Link>
+        )}
       </div>
 
       {d.budgetAlerts.length > 0 && (

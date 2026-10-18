@@ -29,11 +29,12 @@ export const NAV: NavSection[] = [
   },
   { label: "Projects", icon: Building2, href: "/projects" },
   {
-    label: "Labour",
+    label: "Employees",
     icon: HardHat,
     children: [
-      { label: "Workers", href: "/workers" },
+      { label: "Employees & Workers", href: "/workers" },
       { label: "Labour Payment", href: "/labour-payment" },
+      { label: "Cash in Hand", href: "/cash" },
     ],
   },
   { label: "Vendors", icon: Truck, href: "/vendors", roles: PRIVILEGED },

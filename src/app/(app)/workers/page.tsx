@@ -10,30 +10,40 @@ import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { formatPKR, rateLabel } from "@/lib/format";
 import { can } from "@/lib/permissions";
-import { TRADE_LABELS, TRADES, type Trade } from "@/lib/validation/parties";
+import {
+  EMPLOYEE_TYPE_LABELS,
+  EMPLOYEE_TYPES,
+  TRADE_LABELS,
+  TRADES,
+  type EmployeeType,
+  type Trade,
+} from "@/lib/validation/parties";
 import { requireUser } from "@/server/auth";
 import { getSettings } from "@/server/services/settings-service";
 import { listWorkers, type WorkerFilters } from "@/server/services/worker-service";
 import { WorkersTable, type WorkerListRow } from "./workers-table";
 
-export const metadata = { title: "Workers" };
+export const metadata = { title: "Employees" };
 
 export default async function WorkersPage({ searchParams }: PageProps<"/workers">) {
   const actor = await requireUser();
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q : "";
   const trade = TRADES.includes(sp.trade as Trade) ? (sp.trade as Trade) : undefined;
+  const employeeType = EMPLOYEE_TYPES.includes(sp.type as EmployeeType) ? (sp.type as EmployeeType) : undefined;
   const active = (["active", "inactive", "all"] as const).find((a) => a === sp.active) ?? "active";
-  const filters: WorkerFilters = { q, trade, active };
+  const filters: WorkerFilters = { q, trade, employeeType, active };
 
   const [workers, settings] = await Promise.all([listWorkers(actor, filters), getSettings()]);
   const cur = settings.currencyLabel;
   const canManage = can.manageWorkers(actor.role);
-  const filtered = q || trade || active !== "active";
+  const filtered = q || trade || employeeType || active !== "active";
 
   const rows: WorkerListRow[] = workers.map((w) => ({
     id: w.id,
     name: w.name,
+    employeeType: w.employeeType,
+    designation: w.designation ?? "",
     trade: w.trade,
     rate: w.rate.toString(),
     rateType: w.rateType,
@@ -47,11 +57,11 @@ export default async function WorkersPage({ searchParams }: PageProps<"/workers"
   return (
     <>
       <PageHeader
-        title="Workers"
+        title="Employees"
         description={
           can.seeAllProjects(actor.role)
-            ? "Labour register"
-            : "Labour register — totals include only your projects"
+            ? "Labour and staff register"
+            : "Labour and staff register — totals include only your projects"
         }
         actions={
           <>
@@ -60,7 +70,7 @@ export default async function WorkersPage({ searchParams }: PageProps<"/workers"
             </Link>
             {canManage && (
               <Link href="/workers/new" className={buttonVariants()}>
-                <Plus /> New worker
+                <Plus /> New employee
               </Link>
             )}
           </>
@@ -68,7 +78,7 @@ export default async function WorkersPage({ searchParams }: PageProps<"/workers"
       />
       {sp.deleted && (
         <Notice variant="success" className="mb-4">
-          Worker deleted.
+          Employee deleted.
         </Notice>
       )}
 
@@ -81,6 +91,15 @@ export default async function WorkersPage({ searchParams }: PageProps<"/workers"
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input id="q" name="q" defaultValue={q} placeholder="Search name, CNIC or phone" className="pl-8" />
               </div>
+            </Field>
+            <Field label="Type" className="sm:w-44">
+              <Combobox
+                name="type"
+                defaultValue={employeeType ?? ""}
+                clearLabel="All types"
+                placeholder="All types"
+                options={EMPLOYEE_TYPES.map((t) => ({ value: t, label: EMPLOYEE_TYPE_LABELS[t] }))}
+              />
             </Field>
             <Field label="Trade" className="sm:w-44">
               <Combobox
@@ -118,7 +137,7 @@ export default async function WorkersPage({ searchParams }: PageProps<"/workers"
 
       {/* Phones: cards */}
       <div className="space-y-2 sm:hidden">
-        {workers.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No workers found.</p>}
+        {workers.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No employees found.</p>}
         {workers.map((w) => (
           <Link
             key={w.id}
@@ -129,7 +148,8 @@ export default async function WorkersPage({ searchParams }: PageProps<"/workers"
               <div>
                 <div className="font-medium text-primary">{w.name}</div>
                 <div className="text-xs text-muted-foreground">
-                  {TRADE_LABELS[w.trade]} · <span className="font-mono tabular-nums">{rateLabel(w.rate, w.rateType, cur)}</span>
+                  {w.designation ?? (w.employeeType === "LABOUR" ? TRADE_LABELS[w.trade] : EMPLOYEE_TYPE_LABELS[w.employeeType])} ·{" "}
+                  <span className="font-mono tabular-nums">{rateLabel(w.rate, w.rateType, cur)}</span>
                 </div>
               </div>
               {!w.isActive && <ActiveBadge active={false} />}
@@ -146,7 +166,7 @@ export default async function WorkersPage({ searchParams }: PageProps<"/workers"
         rows={rows}
         currency={cur}
         canManage={canManage}
-        emptyText={filtered ? "No workers match these filters." : "No workers yet."}
+        emptyText={filtered ? "No employees match these filters." : "No employees yet."}
       />
     </>
   );

@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { canApproveExpense, canDeleteExpense, canEditExpense } from "@/lib/expense-rules";
+import { can } from "@/lib/permissions";
 import { formatAmount, formatDate, formatDateTime, formatPKR } from "@/lib/format";
 import { PAYMENT_MODE_LABELS } from "@/lib/validation/expenses";
 import { requireUser } from "@/server/auth";
@@ -168,6 +169,23 @@ export default async function ExpenseDetailPage({ params, searchParams }: PagePr
                         worker profile
                       </Link>
                     </>
+                  )}
+                </Row>
+                <Row label="Paid from">
+                  {e.paidFrom ? (
+                    <>
+                      {e.paidFrom.name}&rsquo;s cash in hand
+                      {(can.manageCash(actor.role) || e.paidFrom.userId === actor.id) && (
+                        <>
+                          {" · "}
+                          <Link href={`/cash/${e.paidFrom.id}`} className="text-primary hover:underline">
+                            cash statement
+                          </Link>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    "Company (paid directly)"
                   )}
                 </Row>
                 {e.referenceNo && (

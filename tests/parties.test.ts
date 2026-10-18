@@ -13,10 +13,13 @@ const workerInput = (extra: Partial<WorkerInput> = {}): WorkerInput => ({
   name: "Test Worker",
   cnic: null,
   phone: null,
+  employeeType: "LABOUR",
+  designation: null,
   trade: "MASON",
   rateType: "DAILY",
   rate: "1500",
   defaultProjectId: null,
+  userId: null,
   isActive: true,
   ...extra,
 });

@@ -8,11 +8,14 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ActionState } from "@/lib/forms";
 import {
+  EMPLOYEE_TYPE_LABELS,
+  EMPLOYEE_TYPES,
   RATE_TYPE_LABELS,
   RATE_TYPES,
   TRADE_LABELS,
   TRADES,
   workerSchema,
+  type EmployeeType,
   type RateType,
   type Trade,
 } from "@/lib/validation/parties";
@@ -21,6 +24,9 @@ export type WorkerFormValues = {
   name: string;
   cnic: string;
   phone: string;
+  employeeType: EmployeeType;
+  designation: string;
+  userId: number | null;
   trade: Trade;
   rateType: RateType;
   rate: string;
@@ -29,19 +35,22 @@ export type WorkerFormValues = {
 };
 
 /** RHF values mirror the HTML form: strings ("" = empty), a boolean for the checkbox. */
-type FormValues = Omit<WorkerFormValues, "defaultProjectId"> & { defaultProjectId: string };
+type FormValues = Omit<WorkerFormValues, "defaultProjectId" | "userId"> & { defaultProjectId: string; userId: string };
 
 export function WorkerForm({
   action,
   deleteAction,
   values,
   projects,
+  users,
   cancelHref,
 }: {
   action: (prev: ActionState, fd: FormData) => Promise<ActionState>;
   deleteAction?: () => Promise<ActionState>;
   values?: WorkerFormValues;
   projects: { id: number; code: string; name: string }[];
+  /** Login accounts not yet linked to another employee */
+  users: { id: number; name: string; username: string; isActive: boolean }[];
   cancelHref: string;
 }) {
   const f = useActionForm<FormValues>(action, workerSchema, {
@@ -49,6 +58,9 @@ export function WorkerForm({
       name: values?.name ?? "",
       cnic: values?.cnic ?? "",
       phone: values?.phone ?? "",
+      employeeType: values?.employeeType ?? "LABOUR",
+      designation: values?.designation ?? "",
+      userId: values?.userId ? String(values.userId) : "",
       trade: values?.trade ?? "HELPER",
       rateType: values?.rateType ?? "DAILY",
       rate: values?.rate ?? "",
@@ -60,11 +72,18 @@ export function WorkerForm({
     <ActionForm f={f} className="max-w-3xl space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Worker details</CardTitle>
+          <CardTitle>Employee details</CardTitle>
           <CardDescription>The rate pre-fills the labour payment form.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <TextField name="name" label="Name" required />
+          <ComboboxField
+            name="employeeType"
+            label="Type"
+            required
+            options={EMPLOYEE_TYPES.map((t) => ({ value: t, label: EMPLOYEE_TYPE_LABELS[t] }))}
+          />
+          <TextField name="designation" label="Designation" placeholder="e.g. Site supervisor, Accounts officer" />
           <ComboboxField
             name="trade"
             label="Trade"
@@ -103,17 +122,31 @@ export function WorkerForm({
             placeholder="— None —"
             searchPlaceholder="Search by code or name…"
           />
+          <ComboboxField
+            name="userId"
+            label="Login account"
+            description="Link the employee's own login so the expenses they enter are paid from their cash in hand."
+            className="sm:col-span-2"
+            options={users.map((u) => ({
+              value: String(u.id),
+              label: `${u.name} (@${u.username})`,
+              hint: u.isActive ? undefined : "inactive",
+            }))}
+            clearLabel="— None —"
+            placeholder="— None —"
+            searchPlaceholder="Search logins…"
+          />
           <CheckboxField
             name="isActive"
             label="Active"
-            description="Inactive workers are hidden from the labour payment form."
+            description="Inactive employees are hidden from the payment and cash forms."
             className="sm:col-span-2"
           />
         </CardContent>
       </Card>
       <div className="flex flex-wrap items-start gap-2">
         <Button type="submit" disabled={f.pending}>
-          {f.pending ? "Saving…" : values ? "Save changes" : "Create worker"}
+          {f.pending ? "Saving…" : values ? "Save changes" : "Create employee"}
         </Button>
         <Link href={cancelHref} className={buttonVariants({ variant: "outline" })}>
           Cancel
@@ -122,9 +155,9 @@ export function WorkerForm({
           <DeleteButton
             action={deleteAction}
             className="sm:ml-auto"
-            label="Delete worker"
-            title="Delete worker?"
-            confirmText="Delete this worker? Only possible when they have no payments."
+            label="Delete employee"
+            title="Delete employee?"
+            confirmText="Delete this employee? Only possible when they have no payments or cash entries."
           />
         )}
       </div>

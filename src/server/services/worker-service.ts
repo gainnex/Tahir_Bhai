@@ -2,8 +2,8 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { ADVANCE_SUBHEAD, LABOUR_HEAD } from "@/lib/defaults";
 import { AppError, NotFoundError } from "@/lib/errors";
-import type { Trade, WorkerInput } from "@/lib/validation/parties";
-import { assertCan, type Actor } from "@/server/guards";
+import type { EmployeeType, Trade, WorkerInput } from "@/lib/validation/parties";
+import { assertCan, isUniqueError, type Actor } from "@/server/guards";
 import { icontains } from "@/server/search";
 import { diffChanges, logActivity, snapshot } from "./activity-log";
 import { accessibleProjectIds } from "./project-service";
@@ -26,7 +26,12 @@ async function projectFilter(actor: Actor): Promise<Prisma.ExpenseWhereInput> {
   return ids ? { projectId: { in: ids } } : {};
 }
 
-export type WorkerFilters = { q?: string; trade?: Trade; active?: "active" | "inactive" | "all" };
+export type WorkerFilters = {
+  q?: string;
+  trade?: Trade;
+  employeeType?: EmployeeType;
+  active?: "active" | "inactive" | "all";
+};
 
 export async function listWorkers(actor: Actor, filters: WorkerFilters = {}) {
   const q = filters.q?.trim();
@@ -35,6 +40,7 @@ export async function listWorkers(actor: Actor, filters: WorkerFilters = {}) {
     where: {
       deletedAt: null,
       ...(filters.trade ? { trade: filters.trade } : {}),
+      ...(filters.employeeType ? { employeeType: filters.employeeType } : {}),
       ...(active === "all" ? {} : { isActive: active === "active" }),
       ...(q ? { OR: [{ name: icontains(q) }, { cnic: icontains(q) }, { phone: icontains(q) }] } : {}),
     },
@@ -53,7 +59,10 @@ export async function listWorkers(actor: Actor, filters: WorkerFilters = {}) {
 export async function getWorkerProfile(actor: Actor, id: number, opts: { projectId?: number } = {}) {
   const worker = await db.worker.findFirst({
     where: { id, deletedAt: null },
-    include: { defaultProject: { select: { id: true, code: true, name: true } } },
+    include: {
+      defaultProject: { select: { id: true, code: true, name: true } },
+      user: { select: { id: true, username: true } },
+    },
   });
   if (!worker) throw new NotFoundError("Worker");
 
@@ -138,15 +147,34 @@ export async function listWorkerOptions() {
   return rows.map((w) => ({ ...w, rate: w.rate.toFixed(2) }));
 }
 
-async function workerData(input: WorkerInput) {
+/** Login accounts that can be linked to an employee (not already linked to someone else). */
+export async function listLinkableUsers(workerId?: number) {
+  return db.user.findMany({
+    where: { OR: [{ employee: null }, ...(workerId ? [{ employee: { id: workerId } }] : [])] },
+    select: { id: true, name: true, username: true, isActive: true },
+    orderBy: { name: "asc" },
+  });
+}
+
+async function workerData(input: WorkerInput, workerId?: number) {
   if (input.defaultProjectId) {
     const p = await db.project.findFirst({ where: { id: input.defaultProjectId, deletedAt: null } });
     if (!p) throw new AppError("The selected default project does not exist.");
+  }
+  if (input.userId) {
+    const u = await db.user.findUnique({ where: { id: input.userId }, include: { employee: { select: { id: true, name: true } } } });
+    if (!u) throw new AppError("The selected login account does not exist.");
+    if (u.employee && u.employee.id !== workerId) {
+      throw new AppError(`The login "${u.username}" is already linked to ${u.employee.name}.`);
+    }
   }
   return {
     name: input.name,
     cnic: input.cnic,
     phone: input.phone,
+    employeeType: input.employeeType,
+    designation: input.designation,
+    userId: input.userId,
     trade: input.trade,
     rateType: input.rateType,
     rate: new Prisma.Decimal(input.rate),
@@ -158,28 +186,38 @@ async function workerData(input: WorkerInput) {
 export async function createWorker(actor: Actor, input: WorkerInput) {
   assertCan(actor, "manageWorkers");
   const data = await workerData(input);
-  return db.$transaction(async (tx) => {
-    const worker = await tx.worker.create({ data });
-    await logActivity(
-      { userId: actor.id, action: "CREATE", entityType: "worker", entityId: worker.id, changes: snapshot(worker) },
-      tx,
-    );
-    return worker;
-  });
+  return db
+    .$transaction(async (tx) => {
+      const worker = await tx.worker.create({ data });
+      await logActivity(
+        { userId: actor.id, action: "CREATE", entityType: "worker", entityId: worker.id, changes: snapshot(worker) },
+        tx,
+      );
+      return worker;
+    })
+    .catch(rethrowLinkedUser);
 }
 
 export async function updateWorker(actor: Actor, id: number, input: WorkerInput) {
   assertCan(actor, "manageWorkers");
   const before = await db.worker.findFirst({ where: { id, deletedAt: null } });
   if (!before) throw new NotFoundError("Worker");
-  const data = await workerData(input);
-  await db.$transaction(async (tx) => {
-    await tx.worker.update({ where: { id }, data });
-    const changes = diffChanges(before, data);
-    if (Object.keys(changes).length) {
-      await logActivity({ userId: actor.id, action: "UPDATE", entityType: "worker", entityId: id, changes }, tx);
-    }
-  });
+  const data = await workerData(input, id);
+  await db
+    .$transaction(async (tx) => {
+      await tx.worker.update({ where: { id }, data });
+      const changes = diffChanges(before, data);
+      if (Object.keys(changes).length) {
+        await logActivity({ userId: actor.id, action: "UPDATE", entityType: "worker", entityId: id, changes }, tx);
+      }
+    })
+    .catch(rethrowLinkedUser);
+}
+
+/** Two admins linking the same login at the same moment hit the unique index. */
+function rethrowLinkedUser(e: unknown): never {
+  if (isUniqueError(e, "user")) throw new AppError("That login account is already linked to another employee.");
+  throw e;
 }
 
 /** Soft delete; refused once the worker has payments (mark inactive instead). */
@@ -187,9 +225,14 @@ export async function deleteWorker(actor: Actor, id: number) {
   assertCan(actor, "manageWorkers");
   const worker = await db.worker.findFirst({ where: { id, deletedAt: null } });
   if (!worker) throw new NotFoundError("Worker");
-  const used = await db.expense.count({ where: { workerId: id, deletedAt: null } });
-  if (used > 0) {
-    throw new AppError(`This worker has ${used} payment(s) and cannot be deleted. Mark them inactive instead.`);
+  const [used, cash] = await Promise.all([
+    db.expense.count({ where: { deletedAt: null, OR: [{ workerId: id }, { paidFromId: id }] } }),
+    db.cashEntry.count({ where: { workerId: id, deletedAt: null } }),
+  ]);
+  if (used + cash > 0) {
+    throw new AppError(
+      `This employee has ${used + cash} payment(s) or cash entries and cannot be deleted. Mark them inactive instead.`,
+    );
   }
   await db.$transaction(async (tx) => {
     await tx.worker.update({ where: { id }, data: { deletedAt: new Date() } });

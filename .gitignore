@@ -48,3 +48,6 @@ next-env.d.ts
 /prisma/*.db-journal
 /backups
 /tests/.uploads
+
+# client-supplied documents and databases (private, large)
+/changes
