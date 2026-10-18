@@ -11,7 +11,7 @@ const s = StyleSheet.create({
   page: { padding: 40, fontSize: 10, fontFamily: "Helvetica", color: "#0f172a" },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", borderBottomWidth: 1.5, borderBottomColor: "#0f172a", paddingBottom: 10, marginBottom: 18 },
   brand: { flexDirection: "row", alignItems: "center", gap: 10, maxWidth: "60%" },
-  logo: { height: 44, maxWidth: 110, objectFit: "contain" },
+  logo: { height: 44, maxWidth: 220, objectFit: "contain" },
   company: { fontSize: 15, fontFamily: "Helvetica-Bold" },
   address: { fontSize: 9, color: "#475569", marginTop: 3 },
   docBox: { alignItems: "flex-end" },

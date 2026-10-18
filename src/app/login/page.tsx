@@ -1,5 +1,5 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
-import { HardHat } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/server/auth";
 import { getSettings } from "@/server/services/settings-service";
@@ -16,13 +16,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
     <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          <div className="flex size-11 items-center justify-center rounded-xl bg-sidebar text-sidebar-primary-foreground shadow-sm">
-            <HardHat className="size-5" />
-          </div>
-          <div>
-            <div className="text-lg font-semibold tracking-tight">{settings.companyName}</div>
-            <div className="text-sm text-muted-foreground">Project Expense Manager</div>
-          </div>
+          <Image src="/brand/logo.png" alt={settings.companyName} width={385} height={83} className="h-auto w-64" priority />
+          <div className="text-sm text-muted-foreground">Project Expense Manager</div>
         </div>
         <Card>
           <CardHeader>

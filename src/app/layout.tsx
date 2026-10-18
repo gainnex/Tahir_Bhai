@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   applicationName: "Project Expense Manager",
   // Home-screen app on iPhone (Safari reads these instead of the manifest)
   appleWebApp: { capable: true, title: "Expenses", statusBarStyle: "default" },
-  icons: { apple: "/icons/apple-touch-icon.png" },
+  // Tab and home-screen icons come from app/icon.png and app/apple-icon.png (file conventions)
 };
 
 export const viewport: Viewport = {

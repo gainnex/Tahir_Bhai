@@ -2,7 +2,7 @@
 // (expenses, reports, receipts): pages always come from the network. It only keeps a small
 // offline page, shown when a page can't load because there is no connection.
 
-const CACHE = "pem-offline-v2";
+const CACHE = "pem-offline-v3";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE = [OFFLINE_URL];
 

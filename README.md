@@ -52,6 +52,11 @@ The full specification is in [`docs/`](docs/README.md) (features, database, scre
 - **Activity log** of every create / edit / approve / reject / delete / login with old → new values.
 - Soft delete everywhere, exact decimal money (never floats), `PKR 1,250,000`, dates `DD-MM-YYYY`.
 
+**Branding**: the Line Craft logo is bundled in `public/brand/` (login page, sidebar mark, PDF
+letterhead when no logo is uploaded) and the app / browser-tab icons (`public/icons/`, `src/app/icon.png`,
+`src/app/apple-icon.png`) are made from its "LC" mark. A logo uploaded in Settings → Company replaces it
+on PDFs.
+
 ## Tech stack
 
 Next.js 16 (App Router) + TypeScript · Prisma 6 · PostgreSQL (SQLite for local dev) ·

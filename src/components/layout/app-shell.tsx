@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronsUpDown, HardHat, KeyRound, LogOut, Plus } from "lucide-react";
+import { ChevronsUpDown, KeyRound, LogOut, Plus } from "lucide-react";
 import { logoutAction } from "@/app/login/actions";
 import { InstallAppMenuItem, IosInstallDialog } from "@/components/pwa";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -131,9 +132,8 @@ function AppSidebar({ user, companyName, pendingCount }: Omit<Props, "children" 
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild className="hover:bg-transparent active:bg-transparent">
               <Link href="/" onClick={close}>
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <HardHat className="size-4" />
-                </div>
+                {/* Line Craft "LC" mark, white for the dark sidebar */}
+                <Image src="/brand/mark-white.png" alt="" width={82} height={83} className="size-8 shrink-0 object-contain" priority />
                 <div className="grid flex-1 text-left leading-tight">
                   <span className="truncate font-semibold text-white">{companyName}</span>
                   <span className="truncate text-xs text-sidebar-foreground/70">Project Expense Manager</span>

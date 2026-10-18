@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { Document, Font, Image, Page, renderToBuffer, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { formatAmount, formatDate, formatDateTime } from "@/lib/format";
 import type { CellValue, Report, ReportColumn, ReportTable } from "@/lib/reports";
@@ -15,7 +17,7 @@ const s = StyleSheet.create({
   page: { paddingTop: 28, paddingBottom: 36, paddingHorizontal: 28, fontSize: 8, fontFamily: "Helvetica", color: "#0f172a" },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, borderBottomWidth: 1, borderBottomColor: "#cbd5e1", paddingBottom: 8 },
   brand: { flexDirection: "row", alignItems: "center", gap: 8, maxWidth: "55%" },
-  logo: { height: 36, maxWidth: 90, objectFit: "contain" },
+  logo: { height: 36, maxWidth: 180, objectFit: "contain" },
   company: { fontSize: 13, fontFamily: "Helvetica-Bold" },
   address: { fontSize: 8, color: "#64748b", marginTop: 2 },
   titleBox: { alignItems: "flex-end", maxWidth: "45%" },
@@ -82,13 +84,22 @@ function TableBlock({ table }: { table: ReportTable }) {
   );
 }
 
+/** The uploaded logo (Settings → Company), else the bundled Line Craft logo. */
 export async function loadLogo(settings: AppSettings) {
-  if (!settings.logoPath) return null;
+  if (settings.logoPath) {
+    try {
+      const data = Buffer.from(await readUpload(settings.logoPath));
+      return { data, format: settings.logoPath.endsWith(".png") ? ("png" as const) : ("jpg" as const) };
+    } catch {
+      // missing logo file must not break the report: fall back to the bundled one
+    }
+  }
   try {
-    const data = Buffer.from(await readUpload(settings.logoPath));
-    return { data, format: settings.logoPath.endsWith(".png") ? ("png" as const) : ("jpg" as const) };
+    // turbopackIgnore: a runtime path (the file is added to the server bundle in next.config.ts)
+    const file = path.join(/* turbopackIgnore: true */ process.cwd(), "public", "brand", "logo.png");
+    return { data: await readFile(file), format: "png" as const };
   } catch {
-    return null; // missing logo file must not break the report
+    return null;
   }
 }
 
