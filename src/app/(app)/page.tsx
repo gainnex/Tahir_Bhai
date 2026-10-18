@@ -174,6 +174,15 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
             <AmountBarChart data={d.byHead.map((r) => ({ name: r.head, amount: r.amount.toFixed(2) }))} currency={cur} />
           </CardContent>
         </Card>
+        <Card className="xl:col-span-2">
+          <CardHeader>
+            <CardTitle>Spend by client</CardTitle>
+            <CardDescription>Approved expenses, {periodLabel}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AmountBarChart data={d.byClient.map((r) => ({ name: r.client, amount: r.amount.toFixed(2) }))} currency={cur} />
+          </CardContent>
+        </Card>
       </div>
 
       <div className="mt-8 mb-3 flex items-center justify-between">

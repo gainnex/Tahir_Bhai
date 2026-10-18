@@ -57,6 +57,7 @@ export async function listProjects(actor: Actor, filters: ProjectListFilters = {
                 { code: icontains(q) },
                 { name: icontains(q) },
                 { clientName: icontains(q) },
+                { projectManager: icontains(q) },
                 { location: icontains(q) },
               ],
             }
@@ -77,7 +78,7 @@ export async function listProjects(actor: Actor, filters: ProjectListFilters = {
 export async function listProjectOptions(actor: Actor, opts: { forNewExpense?: boolean } = {}) {
   return db.project.findMany({
     where: { ...projectScope(actor), ...(opts.forNewExpense ? { status: { not: "COMPLETED" } } : {}) },
-    select: { id: true, code: true, name: true, status: true, isHeadOffice: true },
+    select: { id: true, code: true, name: true, clientName: true, status: true, isHeadOffice: true },
     orderBy: [{ isHeadOffice: "desc" }, { code: "asc" }],
   });
 }
@@ -164,6 +165,7 @@ function projectData(input: ProjectInput) {
     code: input.code,
     name: input.name,
     clientName: input.clientName,
+    projectManager: input.projectManager,
     location: input.location,
     startDate: parseInputDate(input.startDate),
     endDate: input.endDate ? parseInputDate(input.endDate) : null,

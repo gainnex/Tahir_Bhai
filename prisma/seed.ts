@@ -17,6 +17,7 @@ import {
   HEAD_OFFICE_CODE,
   HEAD_OFFICE_NAME,
   LABOUR_HEAD,
+  RENAMED_HEADS,
 } from "../src/lib/defaults";
 
 const prisma = new PrismaClient();
@@ -47,6 +48,19 @@ async function seedReferenceData() {
       notes: "Built-in cost center for office overheads. Cannot be deleted.",
     },
   });
+
+  for (const r of RENAMED_HEADS) {
+    let head = await prisma.expenseHead.findUnique({ where: { name: r.from } });
+    if (head && r.from !== r.to && !(await prisma.expenseHead.findUnique({ where: { name: r.to } }))) {
+      head = await prisma.expenseHead.update({ where: { id: head.id }, data: { name: r.to } });
+    }
+    head ??= await prisma.expenseHead.findUnique({ where: { name: r.to } });
+    if (!head) continue;
+    for (const [from, to] of Object.entries(r.subheads ?? {})) {
+      const taken = await prisma.expenseSubhead.findUnique({ where: { headId_name: { headId: head.id, name: to } } });
+      if (!taken) await prisma.expenseSubhead.updateMany({ where: { headId: head.id, name: from }, data: { name: to } });
+    }
+  }
 
   for (const [i, h] of DEFAULT_HEADS.entries()) {
     const head = await prisma.expenseHead.upsert({
@@ -244,12 +258,12 @@ async function seedSampleData(adminId: number) {
     for (const p of [p1, p2]) {
       const siteUser = p.id === p1.id ? site1.id : site2.id;
       await add({
-        date: dateIn(m), projectId: p.id, head: "Materials", sub: "Cement",
+        date: dateIn(m), projectId: p.id, head: "Material Purchasing", sub: "Cement",
         amount: 150_000 + Math.round(rand() * 20) * 5_000, mode: "BANK_TRANSFER",
         paidTo: vendors[0].name, vendorId: vendors[0].id, description: "Cement bags for slab",
       });
       await add({
-        date: dateIn(m), projectId: p.id, head: "Materials", sub: "Steel",
+        date: dateIn(m), projectId: p.id, head: "Material Purchasing", sub: "Steel",
         amount: 200_000 + Math.round(rand() * 30) * 5_000, mode: "CHEQUE",
         paidTo: vendors[1].name, vendorId: vendors[1].id, description: "Steel bars 60 grade",
       });
@@ -300,7 +314,7 @@ async function seedSampleData(adminId: number) {
   // Completed project history
   for (const [i, m] of ["2025-10", "2025-12", "2026-02", "2026-04"].entries()) {
     await add({
-      date: `${m}-1${i}`, projectId: p4.id, head: "Materials", sub: pick(["Cement", "Steel", "Hardware"]),
+      date: `${m}-1${i}`, projectId: p4.id, head: "Material Purchasing", sub: pick(["Cement", "Steel", "Hardware"]),
       amount: 300_000 + i * 50_000, mode: "BANK_TRANSFER", paidTo: vendors[1].name, vendorId: vendors[1].id,
       description: "Warehouse structure materials",
     });
@@ -319,7 +333,7 @@ async function seedSampleData(adminId: number) {
 
   // Pending + rejected entries from site staff
   await add({
-    date: "2026-10-10", projectId: p1.id, head: "Materials", sub: "Electrical", amount: 46_500,
+    date: "2026-10-10", projectId: p1.id, head: "Material Purchasing", sub: "Electrical", amount: 46_500,
     paidTo: vendors[4].name, vendorId: vendors[4].id, description: "Wiring and switches for 3rd floor",
     createdById: site1.id, status: "PENDING",
   });
@@ -332,7 +346,7 @@ async function seedSampleData(adminId: number) {
     paidTo: "Site staff", description: "Meals during concrete pour", createdById: site1.id, status: "PENDING",
   });
   await add({
-    date: "2026-10-08", projectId: p2.id, head: "Equipment & Machinery", sub: "Rental", amount: 60_000,
+    date: "2026-10-08", projectId: p2.id, head: "Tools, Van, Bike", sub: "Rental", amount: 60_000,
     paidTo: "Crane rental", description: "Crane hire 2 days", createdById: site2.id,
     status: "REJECTED", rejectionReason: "Rate not agreed — please attach quotation",
   });
@@ -343,7 +357,7 @@ async function seedSampleData(adminId: number) {
 
 async function main() {
   const admin = await seedReferenceData();
-  console.log("Reference data ready. Admin login: admin / admin123 (must change on first login)");
+  console.log("Reference data ready. Admin login: admin / admin123");
   if (process.env.SEED_SAMPLE_DATA !== "false") await seedSampleData(admin.id);
 }
 

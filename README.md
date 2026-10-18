@@ -47,7 +47,7 @@ npm run dev           # http://localhost:3000
 
 | Username | Password | Role | Notes |
 |---|---|---|---|
-| `admin` | `admin123` | Admin | **Must change password at first login** |
+| `admin` | `admin123` | Director / Admin | |
 | `accountant` | `password123` | Accountant | sample data only |
 | `site1` | `password123` | Site In-charge | assigned to PRJ-001, PRJ-003 |
 | `site2` | `password123` | Site In-charge | assigned to PRJ-002 |

@@ -41,12 +41,12 @@ beforeAll(async () => {
   site = await makeUser("SITE_INCHARGE");
   const mk = async (name: string, budget: string | null, siteIds: number[] = []) =>
     (await createProject(a, {
-      code: `RP-${Date.now()}-${name}`, name, clientName: null, location: null, startDate: "2026-01-01",
+      code: `RP-${Date.now()}-${name}`, name, clientName: null, projectManager: null, location: null, startDate: "2026-01-01",
       endDate: null, status: "ACTIVE", budget, notes: null, siteInchargeIds: siteIds,
     }))!.id;
   p1 = await mk("Report One", "1000", [site.id]);
   p2 = await mk("Report Two", null);
-  const m = await db.expenseHead.findUniqueOrThrow({ where: { name: "Materials" }, include: { subheads: true } });
+  const m = await db.expenseHead.findUniqueOrThrow({ where: { name: "Material Purchasing" }, include: { subheads: true } });
   materials = { id: m.id, sub: m.subheads[0].id };
   const l = await db.expenseHead.findUniqueOrThrow({ where: { name: LABOUR_HEAD }, include: { subheads: true } });
   labour = { id: l.id, wages: l.subheads.find((s) => s.name === "Daily wages")!.id, advance: l.subheads.find((s) => s.name === ADVANCE_SUBHEAD)!.id };

@@ -28,6 +28,7 @@ export default async function EditProjectPage({ params }: PageProps<"/projects/[
           code: project.code,
           name: project.name,
           clientName: project.clientName ?? "",
+          projectManager: project.projectManager ?? "",
           location: project.location ?? "",
           startDate: toInputDate(project.startDate),
           endDate: toInputDate(project.endDate),

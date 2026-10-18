@@ -72,8 +72,8 @@ export const REPORTS: Record<
     defaultPeriod: "all",
   },
   "labour-payments": {
-    title: "Labour Payments",
-    description: "Payments per worker and per project, with advances shown separately.",
+    title: "Employee Expenses",
+    description: "Wages and payments per worker and per project, with advances shown separately.",
     filters: ["project", "worker"],
     defaultPeriod: "month",
   },

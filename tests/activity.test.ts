@@ -26,14 +26,14 @@ describe("activity log", () => {
     const a = await admin();
     const acc = await makeUser("ACCOUNTANT");
     const p1 = (await createProject(a, {
-      code: `AL-${Date.now()}`, name: "Log A", clientName: null, location: null, startDate: "2026-01-01",
+      code: `AL-${Date.now()}`, name: "Log A", clientName: null, projectManager: null, location: null, startDate: "2026-01-01",
       endDate: null, status: "ACTIVE", budget: null, notes: null, siteInchargeIds: [],
     }))!;
     const p2 = (await createProject(a, {
-      code: `AL2-${Date.now()}`, name: "Log B", clientName: null, location: null, startDate: "2026-01-01",
+      code: `AL2-${Date.now()}`, name: "Log B", clientName: null, projectManager: null, location: null, startDate: "2026-01-01",
       endDate: null, status: "ACTIVE", budget: null, notes: null, siteInchargeIds: [],
     }))!;
-    const head = await db.expenseHead.findFirstOrThrow({ where: { name: "Materials" }, include: { subheads: true } });
+    const head = await db.expenseHead.findFirstOrThrow({ where: { name: "Material Purchasing" }, include: { subheads: true } });
     const base = {
       date: "2026-10-01", projectId: p1.id, headId: head.id, subheadId: head.subheads[0].id, amount: "500",
       paymentMode: "CASH" as const, chequeNo: null, paidTo: "X", vendorId: null, workerId: null, referenceNo: null, description: "d",

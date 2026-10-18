@@ -27,7 +27,7 @@ async function newProject(siteInchargeIds: number[] = []) {
   return (await projects.createProject(await admin(), {
     code: `PT-${Date.now()}-${n}`,
     name: "P",
-    clientName: null,
+    clientName: null, projectManager: null,
     location: null,
     startDate: "2026-01-01",
     endDate: null,

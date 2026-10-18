@@ -61,7 +61,8 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
   ]);
   const cur = settings.currencyLabel;
   const hasFilters = Object.entries(f).some(([k, v]) => k !== "page" && k !== "sort" && v !== undefined);
-  const moreOpen = !!(f.subheadId || f.vendorId || f.workerId || f.createdById || f.paymentMode || f.minAmount || f.maxAmount);
+  const clients = [...new Set(projects.map((p) => p.clientName).filter((c): c is string => !!c))].sort();
+  const moreOpen = !!(f.client || f.subheadId || f.vendorId || f.workerId || f.createdById || f.paymentMode || f.minAmount || f.maxAmount);
   const exportQs = queryString({ ...f, page: 1 });
   const exportHref = (format: string) => `/api/reports/expenses${exportQs || "?"}${exportQs ? "&" : ""}format=${format}`;
 
@@ -166,6 +167,16 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
                 <SlidersHorizontal className="size-4" /> More filters
               </summary>
               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                <Field label="Client">
+                  <Combobox
+                    name="client"
+                    defaultValue={f.client ?? ""}
+                    clearLabel="All clients"
+                    placeholder="All clients"
+                    searchPlaceholder="Search clients…"
+                    options={clients.map((c) => ({ value: c, label: c }))}
+                  />
+                </Field>
                 <Field label="Sub-head" className="lg:col-span-2">
                   <Combobox
                     name="subheadId"

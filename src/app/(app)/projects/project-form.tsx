@@ -21,6 +21,7 @@ export type ProjectFormValues = {
   code: string;
   name: string;
   clientName: string;
+  projectManager: string;
   location: string;
   startDate: string; // YYYY-MM-DD
   endDate: string;
@@ -36,6 +37,7 @@ type FormValues = {
   code: string;
   name: string;
   clientName: string;
+  projectManager: string;
   location: string;
   startDate: string;
   endDate: string;
@@ -60,6 +62,7 @@ export function ProjectForm({ action, deleteAction, values, siteIncharges, cance
       code: values?.code ?? "",
       name: values?.name ?? "",
       clientName: values?.clientName ?? "",
+      projectManager: values?.projectManager ?? "",
       location: values?.location ?? "",
       startDate: values?.startDate ?? "",
       endDate: values?.endDate ?? "",
@@ -87,6 +90,7 @@ export function ProjectForm({ action, deleteAction, values, siteIncharges, cance
           />
           <TextField name="name" label="Name" required />
           <TextField name="clientName" label="Client name" />
+          <TextField name="projectManager" label="Project manager" />
           <TextField name="location" label="Location" />
           <DateField name="startDate" label="Start date" required />
           <DateField name="endDate" label="End date" />
@@ -100,7 +104,10 @@ export function ProjectForm({ action, deleteAction, values, siteIncharges, cance
               label: PROJECT_STATUS_LABELS[s],
             }))}
           />
-          <MoneyField name="budget" label="Budget (PKR)" description="Optional" placeholder="e.g. 5000000" />
+          <MoneyField
+            name="budget"
+            label="Contract value / budget (PKR)"
+            description="Optional" placeholder="e.g. 5000000" />
           <TextareaField name="notes" label="Notes" rows={3} className="sm:col-span-2" />
         </CardContent>
       </Card>

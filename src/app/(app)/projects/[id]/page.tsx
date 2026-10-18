@@ -45,6 +45,7 @@ export default async function ProjectProfilePage({ params }: PageProps<"/project
           <>
             <span className="font-mono">{project.code}</span>
             {[project.clientName, project.location].filter(Boolean).map((t) => ` · ${t}`)}
+            {project.projectManager && ` · PM: ${project.projectManager}`}
             {" · Started "}
             <span className="font-mono tabular-nums">{formatDate(project.startDate)}</span>
             {project.endDate && (

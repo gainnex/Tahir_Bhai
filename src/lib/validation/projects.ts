@@ -26,6 +26,7 @@ export const projectSchema = z
       .regex(/^[A-Z0-9][A-Z0-9-]*$/, "Use letters, numbers and dashes only, e.g. PRJ-001"),
     name: requiredText("Name", 150),
     clientName: optionalText(150),
+    projectManager: optionalText(150),
     location: optionalText(150),
     startDate: dateField("Start date"),
     endDate: optionalDate,

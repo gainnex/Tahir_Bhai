@@ -37,6 +37,9 @@ enum Trade {
   PLUMBER
   HELPER
   CARPENTER
+  AC_TECHNICIAN
+  CEILING_WORKER
+  TILE_WORKER
   OTHER
 }
 
@@ -47,6 +50,7 @@ enum RateType {
 
 enum PaymentMode {
   CASH
+  ONLINE_TRANSFER
   BANK_TRANSFER
   CHEQUE
   JAZZCASH
@@ -69,17 +73,17 @@ enum LogAction {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  name         String
-  username     String   @unique
-  email        String?  @unique
-  passwordHash String   @map("password_hash")
-  role         Role
-  isActive     Boolean  @default(true) @map("is_active")
+  id                 Int      @id @default(autoincrement())
+  name               String
+  username           String   @unique
+  email              String?  @unique
+  passwordHash       String   @map("password_hash")
+  role               Role
+  isActive           Boolean  @default(true) @map("is_active")
   // Forces a password change on next login (used for the seeded admin / admin resets)
-  mustChangePassword Boolean @default(false) @map("must_change_password")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  mustChangePassword Boolean  @default(false) @map("must_change_password")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   projects         ProjectUser[]
   expensesCreated  Expense[]     @relation("ExpenseCreatedBy")
@@ -91,20 +95,21 @@ model User {
 }
 
 model Project {
-  id           Int           @id @default(autoincrement())
-  code         String        @unique
-  name         String
-  clientName   String?       @map("client_name")
-  location     String?
-  startDate    DateTime      @map("start_date") @db.Date
-  endDate      DateTime?     @map("end_date") @db.Date
-  status       ProjectStatus @default(ACTIVE)
-  budget       Decimal?      @db.Decimal(14, 2)
-  isHeadOffice Boolean       @default(false) @map("is_head_office")
-  notes        String?
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-  deletedAt    DateTime?     @map("deleted_at")
+  id             Int           @id @default(autoincrement())
+  code           String        @unique
+  name           String
+  clientName     String?       @map("client_name")
+  projectManager String?       @map("project_manager")
+  location       String?
+  startDate      DateTime      @map("start_date") @db.Date
+  endDate        DateTime?     @map("end_date") @db.Date
+  status         ProjectStatus @default(ACTIVE)
+  budget         Decimal?      @db.Decimal(14, 2)
+  isHeadOffice   Boolean       @default(false) @map("is_head_office")
+  notes          String?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  deletedAt      DateTime?     @map("deleted_at")
 
   users          ProjectUser[]
   expenses       Expense[]

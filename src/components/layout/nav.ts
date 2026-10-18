@@ -44,7 +44,7 @@ export const NAV: NavSection[] = [
       { label: "Project Cost Summary", href: "/reports/project-cost-summary" },
       { label: "Expense Head", href: "/reports/expense-head" },
       { label: "Project Ledger", href: "/reports/project-ledger" },
-      { label: "Labour Payments", href: "/reports/labour-payments" },
+      { label: "Employee Expenses", href: "/reports/labour-payments" },
       { label: "Vendors", href: "/reports/vendors" },
     ],
   },

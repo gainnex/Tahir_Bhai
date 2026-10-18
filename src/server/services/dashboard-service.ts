@@ -75,7 +75,7 @@ export async function getDashboard(actor: Actor, period: DashboardPeriod = "year
   const [projects, heads] = await Promise.all([
     db.project.findMany({
       where: { id: { in: byProjectRows.map((r) => r.projectId) } },
-      select: { id: true, code: true, name: true },
+      select: { id: true, code: true, name: true, clientName: true },
     }),
     db.expenseHead.findMany({ where: { id: { in: byHeadRows.map((r) => r.headId) } }, select: { id: true, name: true } }),
   ]);
@@ -88,6 +88,16 @@ export async function getDashboard(actor: Actor, period: DashboardPeriod = "year
     .sort((a, b) => b.amount.comparedTo(a.amount));
   const top = byProjectAll.slice(0, 10);
   const rest = byProjectAll.slice(10).reduce((s, r) => s.plus(r.amount), ZERO);
+
+  // Projects without a client (incl. Head Office) are grouped under "No client"
+  const clientTotals = new Map<string, Prisma.Decimal>();
+  for (const r of byProjectAll) {
+    const client = r.project.clientName ?? "No client";
+    clientTotals.set(client, (clientTotals.get(client) ?? ZERO).plus(r.amount));
+  }
+  const byClient = [...clientTotals]
+    .map(([client, amount]) => ({ client, amount }))
+    .sort((a, b) => b.amount.comparedTo(a.amount));
 
   const byHead = byHeadRows
     .map((r) => ({ head: headName.get(r.headId) ?? "—", amount: r._sum.amount ?? ZERO }))
@@ -121,6 +131,7 @@ export async function getDashboard(actor: Actor, period: DashboardPeriod = "year
     otherProjectsCount: Math.max(0, byProjectAll.length - 10),
     periodTotal: byProjectAll.reduce((s, r) => s.plus(r.amount), ZERO),
     byHead,
+    byClient,
     budgetAlerts,
     latest,
     limitedToAssigned: !can.seeAllProjects(actor.role),

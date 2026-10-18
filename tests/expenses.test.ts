@@ -28,7 +28,7 @@ async function project(status: "ACTIVE" | "COMPLETED" = "ACTIVE", siteIds: numbe
   const p = await projects.createProject(adminA, {
     code: `EX-${Date.now()}-${n}`,
     name: `Expense test ${n}`,
-    clientName: null,
+    clientName: null, projectManager: null,
     location: null,
     startDate: "2026-01-01",
     endDate: null,
@@ -66,7 +66,7 @@ beforeAll(async () => {
   projA = await project("ACTIVE", [site.id]);
   projB = await project("ACTIVE", [site2.id]);
   projDone = await project("COMPLETED", [site.id]);
-  const m = await db.expenseHead.findUniqueOrThrow({ where: { name: "Materials" }, include: { subheads: true } });
+  const m = await db.expenseHead.findUniqueOrThrow({ where: { name: "Material Purchasing" }, include: { subheads: true } });
   materials = {
     id: m.id,
     cement: m.subheads.find((s) => s.name === "Cement")!.id,

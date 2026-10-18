@@ -2,10 +2,11 @@ import { z } from "zod";
 import { dateField, idField, moneyString, optionalId, optionalText, requiredText } from "@/lib/forms";
 import { toPaisa } from "@/lib/money";
 
-export const PAYMENT_MODES = ["CASH", "BANK_TRANSFER", "CHEQUE", "JAZZCASH", "EASYPAISA"] as const;
+export const PAYMENT_MODES = ["CASH", "ONLINE_TRANSFER", "BANK_TRANSFER", "CHEQUE", "JAZZCASH", "EASYPAISA"] as const;
 export type PaymentMode = (typeof PAYMENT_MODES)[number];
 export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
   CASH: "Cash",
+  ONLINE_TRANSFER: "Online Transfer / IBT",
   BANK_TRANSFER: "Bank Transfer",
   CHEQUE: "Cheque",
   JAZZCASH: "JazzCash",
@@ -100,6 +101,8 @@ export const expenseFiltersSchema = z.object({
   from: optionalIsoDate,
   to: optionalIsoDate,
   projectId: optionalPositiveInt,
+  /** Client name (exact match on the project's client) */
+  client: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 150) : undefined), z.string().optional()),
   headId: optionalPositiveInt,
   subheadId: optionalPositiveInt,
   vendorId: optionalPositiveInt,

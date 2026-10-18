@@ -35,7 +35,17 @@ export type VendorInput = z.output<typeof vendorSchema>;
 
 // ---- Workers (labour register) ----
 
-export const TRADES = ["MASON", "ELECTRICIAN", "PLUMBER", "HELPER", "CARPENTER", "OTHER"] as const;
+export const TRADES = [
+  "MASON",
+  "ELECTRICIAN",
+  "PLUMBER",
+  "HELPER",
+  "CARPENTER",
+  "AC_TECHNICIAN",
+  "CEILING_WORKER",
+  "TILE_WORKER",
+  "OTHER",
+] as const;
 export type Trade = (typeof TRADES)[number];
 export const TRADE_LABELS: Record<Trade, string> = {
   MASON: "Mason",
@@ -43,6 +53,9 @@ export const TRADE_LABELS: Record<Trade, string> = {
   PLUMBER: "Plumber",
   HELPER: "Helper",
   CARPENTER: "Carpenter",
+  AC_TECHNICIAN: "AC Technician",
+  CEILING_WORKER: "Ceiling Worker",
+  TILE_WORKER: "Tile Worker",
   OTHER: "Other",
 };
 

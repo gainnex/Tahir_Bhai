@@ -15,7 +15,7 @@ function input(extra: Partial<ProjectInput> = {}): ProjectInput {
   return {
     code: `T-${Date.now()}-${seq}`,
     name: `Test project ${seq}`,
-    clientName: null,
+    clientName: null, projectManager: null,
     location: null,
     startDate: "2026-01-01",
     endDate: null,

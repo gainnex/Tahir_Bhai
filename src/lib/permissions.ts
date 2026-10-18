@@ -5,7 +5,7 @@ export const ROLES = ["ADMIN", "ACCOUNTANT", "SITE_INCHARGE"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
-  ADMIN: "Admin",
+  ADMIN: "Director / Admin",
   ACCOUNTANT: "Accountant",
   SITE_INCHARGE: "Site In-charge",
 };

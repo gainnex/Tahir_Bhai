@@ -31,6 +31,7 @@ const LABELS: Record<string, string> = {
   siteInchargeIds: "Site in-charges",
   rateType: "Rate type",
   clientName: "Client",
+  projectManager: "Project manager",
   startDate: "Start date",
   endDate: "End date",
   mustChangePassword: "Must change password",

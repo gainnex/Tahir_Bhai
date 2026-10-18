@@ -51,6 +51,7 @@ function filterWhere(actor: Actor, f: Partial<ExpenseFilters>): Prisma.ExpenseWh
   if (f.from) and.push({ date: { gte: parseInputDate(f.from) } });
   if (f.to) and.push({ date: { lte: parseInputDate(f.to) } });
   if (f.projectId) and.push({ projectId: f.projectId });
+  if (f.client) and.push({ project: { clientName: f.client } });
   if (f.headId) and.push({ headId: f.headId });
   if (f.subheadId) and.push({ subheadId: f.subheadId });
   if (f.vendorId) and.push({ vendorId: f.vendorId });
