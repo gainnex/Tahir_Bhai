@@ -1,4 +1,4 @@
-import { Prisma, type AttendanceStatus, type EmployeeType } from "@prisma/client";
+import { Prisma, type AttendanceStatus, type EmployeeType, type PaymentMode } from "@prisma/client";
 import { db } from "@/lib/db";
 import { ADVANCE_SUBHEAD, LABOUR_HEAD } from "@/lib/defaults";
 import { AppError, ForbiddenError, NotFoundError } from "@/lib/errors";
@@ -15,10 +15,12 @@ import {
 } from "@/lib/validation/payroll";
 import { assertCan, isUniqueError, type Actor } from "@/server/guards";
 import { diffChanges, logActivity, snapshot } from "./activity-log";
+import { createExpenses } from "./expense-service";
 
 // Office attendance, pay adjustments and the monthly wage sheet (changes/changes.pdf §3).
-// Wages are calculated here; paying them is still a labour payment (an expense under the
-// Workers head), which the wage sheet subtracts as "paid".
+// Wages are calculated here; paying them is a labour payment (an expense under the Workers
+// head) — entered by hand or posted from the wage sheet (postWages) to each employee's cost
+// center (project / sub office / head office) — which the wage sheet subtracts as "paid".
 
 type Tx = Prisma.TransactionClient;
 const ZERO = new Prisma.Decimal(0);
@@ -265,6 +267,8 @@ export async function payAdjustmentWorkers(currentId?: number) {
 
 export type WageRow = {
   worker: { id: number; name: string; employeeType: EmployeeType; designation: string | null; rateType: "DAILY" | "MONTHLY"; rate: Prisma.Decimal };
+  /** Where the employee's pay is charged (their default project / sub office / head office) */
+  costCenter: { id: number; code: string; name: string; status: string; isHeadOffice: boolean; isSubOffice: boolean } | null;
   counts: AttendanceCounts;
   payableDays: number;
   basic: Prisma.Decimal;
@@ -285,7 +289,9 @@ const sumBy = <T extends { workerId: number | null }>(rows: T[], get: (r: T) => 
 };
 
 /** Monthly wages per employee: attendance × rate, ± adjustments, less what was already paid. */
-export async function getWageSheet(actor: Actor, month: string, opts: { employeeType?: EmployeeType } = {}) {
+export type WageSheetOptions = { employeeType?: EmployeeType; costCenterId?: number };
+
+export async function getWageSheet(actor: Actor, month: string, opts: WageSheetOptions = {}) {
   assertCan(actor, "managePayroll");
   const { from, to } = monthRange(month);
   const range = { gte: parseInputDate(from), lte: parseInputDate(to) };
@@ -297,6 +303,7 @@ export async function getWageSheet(actor: Actor, month: string, opts: { employee
       where: {
         deletedAt: null,
         ...(opts.employeeType ? { employeeType: opts.employeeType } : {}),
+        ...(opts.costCenterId ? { defaultProjectId: opts.costCenterId } : {}),
         OR: [
           { isActive: true },
           { attendance: { some: { date: range } } },
@@ -304,7 +311,17 @@ export async function getWageSheet(actor: Actor, month: string, opts: { employee
           { expenses: { some: { ...labourPaid, date: range } } },
         ],
       },
-      select: { id: true, name: true, employeeType: true, designation: true, rateType: true, rate: true },
+      select: {
+        id: true,
+        name: true,
+        employeeType: true,
+        designation: true,
+        rateType: true,
+        rate: true,
+        defaultProject: {
+          select: { id: true, code: true, name: true, status: true, isHeadOffice: true, isSubOffice: true, deletedAt: true },
+        },
+      },
       orderBy: [{ employeeType: "desc" }, { name: "asc" }],
     }),
     monthCounts(month),
@@ -339,8 +356,10 @@ export async function getWageSheet(actor: Actor, month: string, opts: { employee
     const ded = deductions.get(w.id) ?? ZERO;
     const net = basic.plus(add).minus(ded);
     const p = paidBy.get(w.id) ?? ZERO;
+    const { defaultProject: cc, ...worker } = w;
     return {
-      worker: w,
+      worker,
+      costCenter: cc && !cc.deletedAt ? { id: cc.id, code: cc.code, name: cc.name, status: cc.status, isHeadOffice: cc.isHeadOffice, isSubOffice: cc.isSubOffice } : null,
       counts: c,
       payableDays: payableDays(w.rateType, c, days),
       basic,
@@ -378,15 +397,39 @@ export async function getWageSheet(actor: Actor, month: string, opts: { employee
 export async function wageSheetReport(
   actor: Actor,
   month: string,
-  opts: { employeeType?: EmployeeType; print?: boolean } = {},
+  opts: WageSheetOptions & { print?: boolean } = {},
 ): Promise<Report> {
   const sheet = await getWageSheet(actor, month, opts);
   const money = (d: Prisma.Decimal) => d.toFixed(2);
+  const filteredCenter = opts.costCenterId
+    ? await db.project.findUnique({ where: { id: opts.costCenterId }, select: { code: true, name: true } })
+    : null;
+
+  // Totals per cost center (project / sub office / head office)
+  type Center = { label: string; kind: string; employees: number; net: Prisma.Decimal; paid: Prisma.Decimal; toPay: Prisma.Decimal };
+  const centers = new Map<string, Center>();
+  for (const r of sheet.rows) {
+    const key = r.costCenter ? String(r.costCenter.id) : "none";
+    const c = centers.get(key) ?? {
+      label: r.costCenter ? `${r.costCenter.code} — ${r.costCenter.name}` : "Not allocated",
+      kind: !r.costCenter ? "" : r.costCenter.isHeadOffice ? "Head office" : r.costCenter.isSubOffice ? "Sub office" : "Project",
+      employees: 0,
+      net: ZERO,
+      paid: ZERO,
+      toPay: ZERO,
+    };
+    c.employees += 1;
+    c.net = c.net.plus(r.net);
+    c.paid = c.paid.plus(r.paid);
+    if (r.due.isPositive()) c.toPay = c.toPay.plus(r.due);
+    centers.set(key, c);
+  }
   return {
     slug: "wage-sheet",
     title: `Wage Sheet — ${monthLabel(month)}`,
     subtitle: [
       opts.employeeType ? EMPLOYEE_TYPE_LABELS[opts.employeeType] : "All employees",
+      ...(filteredCenter ? [`Cost center: ${filteredCenter.code} ${filteredCenter.name}`] : []),
       `${sheet.days} days`,
       "Approved payments only",
     ].join(" · "),
@@ -395,6 +438,7 @@ export async function wageSheetReport(
       {
         columns: [
           { key: "employee", label: "Employee", type: "text", wide: true },
+          { key: "center", label: "Cost center", type: "text" },
           { key: "rate", label: "Rate", type: "text" },
           { key: "attendance", label: "P / H / A / L", type: "text" },
           { key: "days", label: "Paid days", type: "text" },
@@ -410,6 +454,7 @@ export async function wageSheetReport(
         rows: sheet.rows.map((r) => ({
           cells: {
             employee: r.worker.designation ? `${r.worker.name} (${r.worker.designation})` : r.worker.name,
+            center: r.costCenter?.code ?? "—",
             rate: `${formatAmount(r.worker.rate)}/${r.worker.rateType === "DAILY" ? "day" : "mo"}`,
             attendance: [r.counts.present, r.counts.halfDay, r.counts.absent, r.counts.leave].join(" / "),
             days: String(r.payableDays),
@@ -439,6 +484,126 @@ export async function wageSheetReport(
         },
         empty: "No employees for this month.",
       },
+      {
+        title: "By cost center",
+        columns: [
+          { key: "center", label: "Cost center", type: "text", wide: true },
+          { key: "kind", label: "Type", type: "text" },
+          { key: "employees", label: "Employees", type: "int" },
+          { key: "net", label: "Net payable", type: "money" },
+          { key: "paid", label: "Paid", type: "money" },
+          { key: "toPay", label: "Still to pay", type: "money" },
+        ],
+        rows: [...centers.values()].map((c) => ({
+          cells: { center: c.label, kind: c.kind, employees: c.employees, net: money(c.net), paid: money(c.paid), toPay: money(c.toPay) },
+        })),
+        totals: { center: "Total", employees: sheet.rows.length, net: money(sheet.totals.net), paid: money(sheet.totals.paid), toPay: money(sheet.toPay) },
+      },
     ],
   };
+}
+
+// ---------------------------------------------------------------------------
+// Post wages: turn the wage sheet's balance due into labour payments
+// ---------------------------------------------------------------------------
+
+export const SALARY_SUBHEAD = "Salaries";
+export const WAGES_SUBHEAD = "Daily wages";
+
+/** Why each employee can't be paid from the wage sheet right now (absent = ready to pay). */
+async function postingProblems(rows: WageRow[], month: string) {
+  const out = new Map<number, string>();
+  for (const r of rows) {
+    if (!r.due.isPositive() || r.due.isZero()) out.set(r.worker.id, "nothing due");
+    else if (!r.costCenter) out.set(r.worker.id, "no cost center — set one on the employee");
+    else if (r.costCenter.status === "COMPLETED") out.set(r.worker.id, `cost center ${r.costCenter.code} is Completed`);
+  }
+  // A pending payment would be paid twice once approved
+  const { from, to } = monthRange(month);
+  const pending = await db.expense.findMany({
+    where: {
+      status: "PENDING",
+      deletedAt: null,
+      workerId: { in: rows.map((r) => r.worker.id) },
+      head: { name: LABOUR_HEAD },
+      subhead: { name: { not: ADVANCE_SUBHEAD } },
+      date: { gte: parseInputDate(from), lte: parseInputDate(to) },
+    },
+    select: { workerId: true },
+  });
+  for (const p of pending) {
+    if (!out.has(p.workerId!)) out.set(p.workerId!, "has a pending labour payment this month — approve or reject it first");
+  }
+  return out;
+}
+
+/** Employees with a balance due for the month, and why any of them can't be posted yet. */
+export async function getPostableWages(actor: Actor, month: string) {
+  const sheet = await getWageSheet(actor, month);
+  const due = sheet.rows.filter((r) => r.due.isPositive() && !r.due.isZero());
+  const problems = await postingProblems(due, month);
+  return due.map((r) => ({ row: r, problem: problems.get(r.worker.id) ?? null }));
+}
+
+/**
+ * Pay the selected employees their balance due for the month: one labour payment (Workers head;
+ * "Salaries" for monthly staff, "Daily wages" for daily-rate workers) per employee, charged to their
+ * cost center. Amounts are recalculated here, never taken from the browser. Everything is checked
+ * before the first payment is saved. Returns the new expense ids.
+ */
+export async function postWages(
+  actor: Actor,
+  input: { month: string; date: string; paymentMode: PaymentMode; workerIds: number[] },
+) {
+  assertCan(actor, "managePayroll");
+  const sheet = await getWageSheet(actor, input.month);
+  const rows = [...new Set(input.workerIds)].map((id) => {
+    const r = sheet.rows.find((x) => x.worker.id === id);
+    if (!r) throw new AppError("One of the selected employees is not on this wage sheet. Reload the page.");
+    return r;
+  });
+  const problems = await postingProblems(rows, input.month);
+  if (problems.size) {
+    const list = rows.filter((r) => problems.has(r.worker.id)).map((r) => `${r.worker.name}: ${problems.get(r.worker.id)}`);
+    throw new AppError(`Nothing was posted. ${list.join("; ")}.`);
+  }
+
+  const head = await db.expenseHead.findUnique({ where: { name: LABOUR_HEAD }, include: { subheads: true } });
+  const sub = (name: string) => {
+    const s = head?.subheads.find((x) => x.name === name);
+    if (!head?.isActive || !s?.isActive) {
+      throw new AppError(`The sub-head "${LABOUR_HEAD} / ${name}" is missing or disabled. Ask the admin to enable it.`);
+    }
+    return s.id;
+  };
+  const subheads = { MONTHLY: sub(SALARY_SUBHEAD), DAILY: sub(WAGES_SUBHEAD) };
+
+  const ids: number[] = [];
+  for (const r of rows) {
+    const [id] = await createExpenses(actor, {
+      kind: "labour",
+      data: {
+        date: input.date,
+        projectId: r.costCenter!.id,
+        headId: head!.id,
+        subheadId: subheads[r.worker.rateType],
+        amount: r.due.toFixed(2),
+        paymentMode: input.paymentMode,
+        chequeNo: null,
+        paidTo: r.worker.name,
+        vendorId: null,
+        workerId: r.worker.id,
+        paidFromId: null,
+        referenceNo: `WAGES-${input.month}`,
+        description:
+          r.worker.rateType === "MONTHLY"
+            ? `Salary — ${monthLabel(input.month)}`
+            : `Wages — ${monthLabel(input.month)} (${r.payableDays} days)`,
+        gstAmount: null,
+        whtAmount: null,
+      },
+    });
+    ids.push(id);
+  }
+  return ids;
 }

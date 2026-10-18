@@ -38,6 +38,11 @@ export default async function ProjectProfilePage({ params }: PageProps<"/project
         title={
           <span className="flex flex-wrap items-center gap-2">
             {project.name} <ProjectStatusBadge status={project.status} />
+            {(project.isHeadOffice || project.isSubOffice) && (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                {project.isHeadOffice ? "Head office" : "Sub office"}
+              </span>
+            )}
             {over && <OverBudgetBadge />}
           </span>
         }

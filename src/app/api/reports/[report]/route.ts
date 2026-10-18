@@ -28,7 +28,12 @@ export async function GET(request: Request, ctx: RouteContext<"/api/reports/[rep
     if (slug === "expenses") report = await expenseListReport(user, parseExpenseFilters(sp));
     else if (slug === "wage-sheet") {
       const employeeType = EMPLOYEE_TYPES.includes(sp.type as EmployeeType) ? (sp.type as EmployeeType) : undefined;
-      report = await wageSheetReport(user, parseMonth(sp.month) ?? todayPK().slice(0, 7), { employeeType, print: format === "pdf" });
+      const costCenterId = /^\d+$/.test(sp.cc ?? "") ? Number(sp.cc) : undefined;
+      report = await wageSheetReport(user, parseMonth(sp.month) ?? todayPK().slice(0, 7), {
+        employeeType,
+        costCenterId,
+        print: format === "pdf",
+      });
     } else report = await buildReport(user, slug, parseReportFilters(sp, REPORTS[slug].defaultPeriod, todayPK()));
   } catch (e) {
     if (e instanceof ForbiddenError) return new Response(e.message, { status: 403 });

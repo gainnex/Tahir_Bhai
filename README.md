@@ -7,7 +7,8 @@ The full specification is in [`docs/`](docs/README.md) (features, database, scre
 
 ## Features
 
-- **Projects** with optional budgets, a built-in *Head Office / General* cost center, budget bars
+- **Projects** with optional budgets, a built-in *Head Office / General* cost center, **sub offices**
+  (branch cost centers for their overheads and staff salaries), budget bars
   (green < 80 %, amber 80–100 %, red > 100 %) and a profile page with spend by head.
 - **Expense heads & sub-heads** (9 heads / 33 sub-heads pre-loaded), add / rename / disable.
 - **Expenses** with receipt upload (JPG/PNG/PDF, 5 MB each, photos auto-shrunk on phones), five
@@ -25,7 +26,10 @@ The full specification is in [`docs/`](docs/README.md) (features, database, scre
   whose default project is assigned to them.
 - **Wage sheet** per month (Admin / Accountant): attendance × rate, plus **benefits / rewards /
   incentives**, less **deductions / advance recovery**, less approved labour payments = balance due;
-  outstanding advance per employee. Excel export; the PDF has a signature column.
+  outstanding advance per employee, totals per cost center. Excel export; the PDF has a signature
+  column. **Post wages** pays the selected balances in one go: one labour payment each ("Salaries" for
+  monthly staff, "Daily wages" for daily-rate workers), charged to the employee's cost center
+  (project / sub office / head office).
 - **Cash in hand** per employee: opening balance, funds given (cash / online transfer), cash
   returned, and expenses marked *Paid from* that employee. Running-balance statement per employee;
   an employee whose login is linked sees their own.
@@ -174,6 +178,9 @@ Other decisions made during the build:
   the month, excluding "Advance to labour"; advance balance = advances to month end − advance
   recoveries. Attendance can't be marked for future dates. Joining / leaving mid-month is not
   pro-rated.
+- Posting wages (`postWages`) recalculates every amount on the server and checks the whole batch
+  first: anyone with nothing due, no cost center, a Completed cost center or a pending labour
+  payment that month stops the batch, so nothing is paid twice. Cheques are entered one by one.
 - Taxes: `amount` stays the gross bill (the project's cost, used by every total); `gst_amount`
   and `wht_amount` are optional parts of it, each ≤ the amount (`expenses.ts` zod schemas).
 

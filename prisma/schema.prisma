@@ -143,6 +143,8 @@ model Project {
   status         ProjectStatus @default(ACTIVE)
   budget         Decimal?      @db.Decimal(14, 2)
   isHeadOffice   Boolean       @default(false) @map("is_head_office")
+  // A branch / regional office: a cost center for its overheads and staff salaries, not a client job
+  isSubOffice    Boolean       @default(false) @map("is_sub_office")
   notes          String?
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")

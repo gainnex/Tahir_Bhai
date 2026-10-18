@@ -27,11 +27,11 @@ describe("activity log", () => {
     const acc = await makeUser("ACCOUNTANT");
     const p1 = (await createProject(a, {
       code: `AL-${Date.now()}`, name: "Log A", clientName: null, projectManager: null, location: null, startDate: "2026-01-01",
-      endDate: null, status: "ACTIVE", budget: null, notes: null, siteInchargeIds: [],
+      endDate: null, status: "ACTIVE", budget: null, notes: null, isSubOffice: false, siteInchargeIds: [],
     }))!;
     const p2 = (await createProject(a, {
       code: `AL2-${Date.now()}`, name: "Log B", clientName: null, projectManager: null, location: null, startDate: "2026-01-01",
-      endDate: null, status: "ACTIVE", budget: null, notes: null, siteInchargeIds: [],
+      endDate: null, status: "ACTIVE", budget: null, notes: null, isSubOffice: false, siteInchargeIds: [],
     }))!;
     const head = await db.expenseHead.findFirstOrThrow({ where: { name: "Material Purchasing" }, include: { subheads: true } });
     const base = {

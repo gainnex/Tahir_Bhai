@@ -172,7 +172,7 @@ export default async function WorkerProfilePage({ params, searchParams }: PagePr
             </Row>
             <Row label="CNIC">{worker.cnic ? <span className="font-mono tabular-nums">{worker.cnic}</span> : none}</Row>
             <Row label="Phone">{worker.phone ? <span className="font-mono tabular-nums">{worker.phone}</span> : none}</Row>
-            <Row label="Default project">
+            <Row label="Cost center">
               {/* Plain text: a site in-charge may not have access to this project */}
               {worker.defaultProject ? (
                 <span>

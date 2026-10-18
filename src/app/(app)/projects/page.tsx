@@ -37,6 +37,7 @@ export default async function ProjectsPage({ searchParams }: PageProps<"/project
     budget: p.budget ? p.budget.toString() : null,
     spent: p.spent.toString(),
     usage: p.usage,
+    kind: p.isHeadOffice ? "Head office" : p.isSubOffice ? "Sub office" : null,
   }));
 
   return (

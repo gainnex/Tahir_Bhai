@@ -37,6 +37,7 @@ export default async function EditProjectPage({ params }: PageProps<"/projects/[
           notes: project.notes ?? "",
           siteInchargeIds: project.users.map((u) => u.userId),
           isHeadOffice: project.isHeadOffice,
+          isSubOffice: project.isSubOffice,
         }}
       />
     </>

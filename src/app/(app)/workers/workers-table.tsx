@@ -92,7 +92,7 @@ export function WorkersTable({
     },
     {
       accessorKey: "defaultProjectCode",
-      header: ({ column }) => <SortHeader column={column} title="Default project" />,
+      header: ({ column }) => <SortHeader column={column} title="Cost center" />,
       cell: ({ row }) =>
         row.original.defaultProjectCode ? (
           <Tooltip>

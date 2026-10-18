@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { ActionState } from "@/lib/forms";
-import { payAdjustmentSchema } from "@/lib/validation/payroll";
+import { payAdjustmentSchema, postWagesSchema } from "@/lib/validation/payroll";
 import { parseForm, runAction } from "@/server/action-utils";
 import { requireUser } from "@/server/auth";
-import { createPayAdjustment, deletePayAdjustment, updatePayAdjustment } from "@/server/services/payroll-service";
+import { createPayAdjustment, deletePayAdjustment, postWages, updatePayAdjustment } from "@/server/services/payroll-service";
 
 export async function createPayAdjustmentAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   return runAction(async () => {
@@ -36,5 +36,17 @@ export async function deletePayAdjustmentAction(id: number, month: string): Prom
     await deletePayAdjustment(actor, id);
     revalidatePath("/payroll");
     redirect(`/payroll?month=${month}&deleted=1`);
+  });
+}
+
+export async function postWagesAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    const actor = await requireUser();
+    const parsed = parseForm(postWagesSchema, fd);
+    if (!parsed.ok) return parsed.state;
+    const ids = await postWages(actor, parsed.data);
+    revalidatePath("/payroll");
+    revalidatePath("/expenses");
+    redirect(`/payroll?month=${parsed.data.month}&posted=${ids.length}`);
   });
 }

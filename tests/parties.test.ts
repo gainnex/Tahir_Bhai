@@ -37,6 +37,7 @@ async function newProject(siteInchargeIds: number[] = []) {
     status: "ACTIVE",
     budget: null,
     notes: null,
+    isSubOffice: false,
     siteInchargeIds,
   }))!;
 }

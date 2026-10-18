@@ -115,7 +115,8 @@ export function WorkerForm({
           <MoneyField name="rate" label="Rate (PKR)" required placeholder="1500" description="Per day or per month" />
           <ComboboxField
             name="defaultProjectId"
-            label="Default project"
+            label="Cost center (project / sub office / head office)"
+            description="Where this employee works: their wages and salary are charged here when posted from the wage sheet."
             className="sm:col-span-2"
             options={projects.map((p) => ({ value: String(p.id), label: `${p.code} — ${p.name}` }))}
             clearLabel="— None —"

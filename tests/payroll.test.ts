@@ -4,18 +4,24 @@ import { ADVANCE_SUBHEAD, LABOUR_HEAD } from "@/lib/defaults";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { basicPay, daysInMonth, monthRange, payableDays, shiftMonth } from "@/lib/payroll";
 import type { ExpenseInput } from "@/lib/validation/expenses";
-import { attendanceFromForm, attendanceSheetSchema, payAdjustmentSchema, type PayAdjustmentInput } from "@/lib/validation/payroll";
+import {
+  attendanceFromForm,
+  attendanceSheetSchema,
+  payAdjustmentSchema,
+  postWagesSchema,
+  type PayAdjustmentInput,
+} from "@/lib/validation/payroll";
 import { entityHref } from "@/server/services/activity-service";
 import { createExpenses } from "@/server/services/expense-service";
 import * as payroll from "@/server/services/payroll-service";
-import { createProject } from "@/server/services/project-service";
+import { createProject, listProjectOptions, updateProject } from "@/server/services/project-service";
 import { admin, makeUser } from "./helpers";
 
 // Office attendance, benefits / deductions and the wage sheet (changes/changes.pdf §3).
 
 type Actor = Awaited<ReturnType<typeof makeUser>>;
 let acc: Actor, site: Actor;
-let siteProject: number, otherProject: number;
+let siteProject: number, otherProject: number, subOffice: number;
 let labour: { id: number; wages: number; advance: number };
 
 const MONTH = "2026-07";
@@ -71,13 +77,14 @@ beforeAll(async () => {
   const a = await admin();
   acc = await makeUser("ACCOUNTANT"); // auto-approve is on in the seed
   site = await makeUser("SITE_INCHARGE");
-  const mk = async (name: string, siteIds: number[]) =>
+  const mk = async (name: string, siteIds: number[], isSubOffice = false) =>
     (await createProject(a, {
       code: `PY-${Date.now()}-${name}`, name, clientName: null, projectManager: null, location: null, startDate: "2026-01-01",
-      endDate: null, status: "ACTIVE", budget: null, notes: null, siteInchargeIds: siteIds,
+      endDate: null, status: "ACTIVE", budget: null, notes: null, isSubOffice, siteInchargeIds: siteIds,
     }))!.id;
   siteProject = await mk("Site", [site.id]);
   otherProject = await mk("Other", []);
+  subOffice = await mk("Lahore office", [], true);
   const l = await db.expenseHead.findUniqueOrThrow({ where: { name: LABOUR_HEAD }, include: { subheads: true } });
   labour = {
     id: l.id,
@@ -230,5 +237,98 @@ describe("wage sheet", () => {
     expect(screen.tables[0].columns.some((c) => c.key === "signature")).toBe(false);
     expect(print.tables[0].columns.at(-1)?.key).toBe("signature");
     expect(screen.title).toBe("Wage Sheet — July 2026");
+  });
+});
+
+describe("sub offices & posting wages to cost centers", () => {
+  const POST_MONTH = "2026-05";
+
+  it("a sub office is a cost center listed after Head Office; Head Office can't become one", async () => {
+    const opts = await listProjectOptions(acc);
+    const ho = opts.findIndex((p) => p.isHeadOffice);
+    const so = opts.findIndex((p) => p.id === subOffice);
+    expect(opts[so].isSubOffice).toBe(true);
+    expect(ho).toBeLessThan(so);
+    expect(opts.findIndex((p) => p.id === siteProject)).toBeGreaterThan(so);
+
+    const hoRow = await db.project.findFirstOrThrow({ where: { isHeadOffice: true } });
+    await updateProject(await admin(), hoRow.id, {
+      code: hoRow.code, name: hoRow.name, clientName: null, projectManager: null, location: null, startDate: "2026-01-01",
+      endDate: null, status: "ACTIVE", budget: null, notes: null, isSubOffice: true, siteInchargeIds: [],
+    });
+    expect((await db.project.findUniqueOrThrow({ where: { id: hoRow.id } })).isSubOffice).toBe(false);
+  });
+
+  it("wage sheet shows each employee's cost center, filters by it and totals per cost center", async () => {
+    const w = await worker({ rateType: "MONTHLY", rate: "31000", projectId: subOffice });
+    const r = await rowOf(w.id, POST_MONTH);
+    expect(r.costCenter).toMatchObject({ id: subOffice, isSubOffice: true });
+
+    const filtered = await payroll.getWageSheet(acc, POST_MONTH, { costCenterId: subOffice });
+    expect(filtered.rows.length).toBeGreaterThan(0);
+    expect(filtered.rows.every((x) => x.costCenter?.id === subOffice)).toBe(true);
+
+    const report = await payroll.wageSheetReport(acc, POST_MONTH, { costCenterId: subOffice });
+    const byCenter = report.tables[1];
+    expect(byCenter.title).toBe("By cost center");
+    expect(byCenter.rows[0].cells).toMatchObject({ kind: "Sub office" });
+  });
+
+  it("posts each balance due as a salary / wage payment charged to the cost center", async () => {
+    const staff = await worker({ rateType: "MONTHLY", rate: "31000", projectId: subOffice });
+    const daily = await worker({ rate: "1500", projectId: siteProject });
+    await payroll.saveAttendance(acc, mark(`${POST_MONTH}-04`, [[staff.id, "ABSENT"], [daily.id, "PRESENT"]]));
+    await payroll.saveAttendance(acc, mark(`${POST_MONTH}-05`, [[daily.id, "HALF_DAY"]]));
+    await payroll.createPayAdjustment(acc, adj(staff.id, { date: `${POST_MONTH}-20`, type: "REWARD", amount: "2000" }));
+
+    const ids = await payroll.postWages(acc, {
+      month: POST_MONTH, date: "2026-05-31", paymentMode: "BANK_TRANSFER", workerIds: [staff.id, daily.id, staff.id],
+    });
+    expect(ids).toHaveLength(2); // duplicates ignored
+    const rows = await db.expense.findMany({ where: { id: { in: ids } }, include: { subhead: true }, orderBy: { id: "asc" } });
+    expect(rows[0]).toMatchObject({ projectId: subOffice, workerId: staff.id, status: "APPROVED", referenceNo: "WAGES-2026-05" });
+    expect(rows[0].subhead.name).toBe("Salaries");
+    expect(rows[0].amount.toFixed(2)).toBe("32000.00"); // 31000 - 1000 absent + 2000 reward
+    expect(rows[1]).toMatchObject({ projectId: siteProject, workerId: daily.id });
+    expect(rows[1].subhead.name).toBe("Daily wages");
+    expect(rows[1].amount.toFixed(2)).toBe("2250.00");
+    expect(rows[1].description).toContain("1.5 days");
+
+    // Paid now: nothing left, and posting again is refused
+    expect((await rowOf(staff.id, POST_MONTH)).due.toFixed(2)).toBe("0.00");
+    await expect(
+      payroll.postWages(acc, { month: POST_MONTH, date: "2026-05-31", paymentMode: "CASH", workerIds: [staff.id] }),
+    ).rejects.toThrow(/nothing due/);
+  });
+
+  it("refuses the whole batch when anyone can't be paid", async () => {
+    const ok = await worker({ rateType: "MONTHLY", rate: "10000", projectId: subOffice });
+    const unallocated = await worker({ rateType: "MONTHLY", rate: "10000" });
+    const pending = await worker({ rateType: "MONTHLY", rate: "10000", projectId: siteProject });
+    await pay(site, pending.id, "100", { date: `${POST_MONTH}-10` }); // site in-charge entry stays pending
+
+    const before = await db.expense.count();
+    await expect(
+      payroll.postWages(acc, { month: POST_MONTH, date: "2026-05-31", paymentMode: "CASH", workerIds: [ok.id, unallocated.id] }),
+    ).rejects.toThrow(/no cost center/);
+    await expect(
+      payroll.postWages(acc, { month: POST_MONTH, date: "2026-05-31", paymentMode: "CASH", workerIds: [ok.id, pending.id] }),
+    ).rejects.toThrow(/pending labour payment/);
+    expect(await db.expense.count()).toBe(before);
+
+    const postable = await payroll.getPostableWages(acc, POST_MONTH);
+    expect(postable.find((p) => p.row.worker.id === ok.id)?.problem).toBeNull();
+    expect(postable.find((p) => p.row.worker.id === unallocated.id)?.problem).toMatch(/no cost center/);
+
+    await expect(
+      payroll.postWages(site, { month: POST_MONTH, date: "2026-05-31", paymentMode: "CASH", workerIds: [ok.id] }),
+    ).rejects.toThrow(ForbiddenError);
+  });
+
+  it("bulk posting doesn't take cheques (each needs its own number)", () => {
+    const base = { month: "2026-05", date: "2026-05-31", workerIds: ["1", "2"] };
+    expect(postWagesSchema.safeParse({ ...base, paymentMode: "CHEQUE" }).success).toBe(false);
+    expect(postWagesSchema.safeParse({ ...base, paymentMode: "CASH" }).data?.workerIds).toEqual([1, 2]);
+    expect(postWagesSchema.safeParse({ ...base, paymentMode: "CASH", workerIds: undefined }).success).toBe(false);
   });
 });

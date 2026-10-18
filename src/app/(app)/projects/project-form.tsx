@@ -4,6 +4,7 @@ import Link from "next/link";
 import { DeleteButton } from "@/components/forms/delete-button";
 import {
   ActionForm,
+  CheckboxField,
   CheckboxGroupField,
   ComboboxField,
   DateField,
@@ -30,6 +31,7 @@ export type ProjectFormValues = {
   notes: string;
   siteInchargeIds: number[];
   isHeadOffice: boolean;
+  isSubOffice: boolean;
 };
 
 /** RHF values mirror the HTML form: strings, checkbox group as string[]. */
@@ -44,6 +46,7 @@ type FormValues = {
   status: string;
   budget: string;
   notes: string;
+  isSubOffice: boolean;
   siteInchargeIds: string[];
 };
 
@@ -69,6 +72,7 @@ export function ProjectForm({ action, deleteAction, values, siteIncharges, cance
       status: values?.status ?? "ACTIVE",
       budget: values?.budget ?? "",
       notes: values?.notes ?? "",
+      isSubOffice: values?.isSubOffice ?? false,
       siteInchargeIds: values?.siteInchargeIds.map(String) ?? [],
     },
   });
@@ -109,6 +113,14 @@ export function ProjectForm({ action, deleteAction, values, siteIncharges, cance
             label="Contract value / budget (PKR)"
             description="Optional" placeholder="e.g. 5000000" />
           <TextareaField name="notes" label="Notes" rows={3} className="sm:col-span-2" />
+          {!isHeadOffice && (
+            <CheckboxField
+              name="isSubOffice"
+              label="This is a sub office"
+              description="A branch / regional office rather than a client project: a cost center for its overheads and the salaries of staff allocated to it."
+              className="sm:col-span-2"
+            />
+          )}
         </CardContent>
       </Card>
 

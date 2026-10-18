@@ -64,8 +64,8 @@ export async function listProjects(actor: Actor, filters: ProjectListFilters = {
           : {},
       ],
     },
-    // Head Office first, then by code
-    orderBy: [{ isHeadOffice: "desc" }, { code: "asc" }],
+    // Head Office first, then sub offices, then by code
+    orderBy: [{ isHeadOffice: "desc" }, { isSubOffice: "desc" }, { code: "asc" }],
   });
   const spent = await spentByProject(projects.map((p) => p.id));
   return projects.map((p) => {
@@ -78,8 +78,8 @@ export async function listProjects(actor: Actor, filters: ProjectListFilters = {
 export async function listProjectOptions(actor: Actor, opts: { forNewExpense?: boolean } = {}) {
   return db.project.findMany({
     where: { ...projectScope(actor), ...(opts.forNewExpense ? { status: { not: "COMPLETED" } } : {}) },
-    select: { id: true, code: true, name: true, clientName: true, status: true, isHeadOffice: true },
-    orderBy: [{ isHeadOffice: "desc" }, { code: "asc" }],
+    select: { id: true, code: true, name: true, clientName: true, status: true, isHeadOffice: true, isSubOffice: true },
+    orderBy: [{ isHeadOffice: "desc" }, { isSubOffice: "desc" }, { code: "asc" }],
   });
 }
 
@@ -172,6 +172,7 @@ function projectData(input: ProjectInput) {
     status: input.status,
     budget: input.budget ? new Prisma.Decimal(input.budget) : null,
     notes: input.notes,
+    isSubOffice: input.isSubOffice,
   };
 }
 
@@ -218,6 +219,7 @@ export async function updateProject(actor: Actor, id: number, input: ProjectInpu
   if (before.isHeadOffice) {
     // The built-in cost center keeps its code and can never be closed.
     data.code = before.code;
+    data.isSubOffice = false;
     if (data.status === "COMPLETED") throw new AppError("Head Office / General cannot be marked Completed.");
   }
   const userIds = await validSiteInchargeIds(input.siteInchargeIds);

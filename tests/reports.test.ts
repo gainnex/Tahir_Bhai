@@ -42,7 +42,7 @@ beforeAll(async () => {
   const mk = async (name: string, budget: string | null, siteIds: number[] = []) =>
     (await createProject(a, {
       code: `RP-${Date.now()}-${name}`, name, clientName: null, projectManager: null, location: null, startDate: "2026-01-01",
-      endDate: null, status: "ACTIVE", budget, notes: null, siteInchargeIds: siteIds,
+      endDate: null, status: "ACTIVE", budget, notes: null, isSubOffice: false, siteInchargeIds: siteIds,
     }))!.id;
   p1 = await mk("Report One", "1000", [site.id]);
   p2 = await mk("Report Two", null);

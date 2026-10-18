@@ -35,7 +35,7 @@ async function project(status: "ACTIVE" | "COMPLETED" = "ACTIVE", siteIds: numbe
     status,
     budget: null,
     notes: null,
-    siteInchargeIds: siteIds,
+    isSubOffice: false, siteInchargeIds: siteIds,
   });
   return p!.id;
 }

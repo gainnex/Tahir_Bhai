@@ -22,7 +22,7 @@ function input(extra: Partial<ProjectInput> = {}): ProjectInput {
     status: "ACTIVE",
     budget: "1000000",
     notes: null,
-    siteInchargeIds: [],
+    isSubOffice: false, siteInchargeIds: [],
     ...extra,
   };
 }

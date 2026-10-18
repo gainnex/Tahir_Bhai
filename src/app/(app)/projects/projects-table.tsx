@@ -22,6 +22,8 @@ export type ProjectListRow = {
   budget: string | null; // decimal string
   spent: string; // decimal string
   usage: BudgetUsage | null;
+  /** "Head office" / "Sub office" badge; null for client projects */
+  kind: string | null;
 };
 
 const byNumber = (a: string | null, b: string | null) => Number(a ?? -1) - Number(b ?? -1);
@@ -55,6 +57,11 @@ export function ProjectsTable({
           <Link href={`/projects/${row.original.id}`} className="font-medium text-primary hover:underline">
             {row.original.name}
           </Link>
+          {row.original.kind && (
+            <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+              {row.original.kind}
+            </span>
+          )}
           <div className="text-xs text-muted-foreground">
             {[row.original.clientName, row.original.location].filter(Boolean).join(" · ")}
           </div>

@@ -8,7 +8,7 @@ export type NameMaps = Record<string, Record<number, string>>;
 
 const LABELS: Record<string, string> = {
   projectId: "Project",
-  defaultProjectId: "Default project",
+  defaultProjectId: "Cost center",
   headId: "Head",
   subheadId: "Sub-head",
   vendorId: "Vendor",
@@ -34,6 +34,7 @@ const LABELS: Record<string, string> = {
   autoApproved: "Auto-approved",
   isActive: "Active",
   isHeadOffice: "Head office",
+  isSubOffice: "Sub office",
   siteInchargeIds: "Site in-charges",
   rateType: "Rate type",
   clientName: "Client",

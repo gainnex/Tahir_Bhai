@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { dateField, optionalDate, optionalMoney, optionalText, requiredText } from "@/lib/forms";
+import { checkbox, dateField, optionalDate, optionalMoney, optionalText, requiredText } from "@/lib/forms";
 
 export const PROJECT_STATUSES = ["ACTIVE", "ON_HOLD", "COMPLETED"] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
@@ -33,6 +33,8 @@ export const projectSchema = z
     status: z.enum(PROJECT_STATUSES, { error: "Select a status" }),
     budget: optionalMoney("Budget"),
     notes: optionalText(2000),
+    /** Sub office cost center (changes/changes.pdf §3: salaries "allocated to projects, sub office, head office") */
+    isSubOffice: checkbox,
     siteInchargeIds: idList,
   })
   .refine((d) => !d.endDate || d.endDate >= d.startDate, {

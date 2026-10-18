@@ -86,7 +86,7 @@ beforeAll(async () => {
     status: "ACTIVE",
     budget: null,
     notes: null,
-    siteInchargeIds: [site.id, otherSite.id],
+    isSubOffice: false, siteInchargeIds: [site.id, otherSite.id],
   });
   projectId = p!.id;
   const head = await db.expenseHead.findFirstOrThrow({ where: { name: "Material Purchasing" }, include: { subheads: true } });

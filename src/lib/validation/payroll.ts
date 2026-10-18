@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { dateField, idField, moneyString, optionalText } from "@/lib/forms";
+import { PAYMENT_MODES, type PaymentMode } from "./expenses";
 
 // Attendance and pay adjustments (changes/changes.pdf §3).
 
@@ -64,3 +65,17 @@ export function attendanceFromForm(fd: FormData): unknown {
   }
   return { date: fd.get("date"), marks };
 }
+
+/** Payment modes for posting wages in bulk (cheques need one number each, so they are entered singly). */
+export const WAGE_PAYMENT_MODES = PAYMENT_MODES.filter((m) => m !== "CHEQUE");
+
+export const postWagesSchema = z.object({
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Pick a month"),
+  date: dateField("Payment date"),
+  paymentMode: z.enum(WAGE_PAYMENT_MODES as [PaymentMode, ...PaymentMode[]], { error: "Select a payment mode" }),
+  workerIds: z.preprocess(
+    (v) => (v === undefined || v === "" ? [] : Array.isArray(v) ? v : [v]),
+    z.array(z.coerce.number().int().positive()).min(1, "Select at least one employee"),
+  ),
+});
+export type PostWagesInput = z.output<typeof postWagesSchema>;
