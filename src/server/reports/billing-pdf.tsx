@@ -42,7 +42,8 @@ async function Letterhead({ settings, title, number, date }: { settings: AppSett
         {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image, not an HTML img */}
         {logo && <Image src={logo} style={s.logo} />}
         <View>
-          <Text style={s.company}>{settings.companyName}</Text>
+          {/* The logo already shows the company name */}
+              {!logo && <Text style={s.company}>{settings.companyName}</Text>}
           {settings.companyAddress && <Text style={s.address}>{settings.companyAddress}</Text>}
         </View>
       </View>
