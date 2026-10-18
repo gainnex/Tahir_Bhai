@@ -22,7 +22,9 @@ export const RECEIPT_TYPES: UploadMime[] = ["image/jpeg", "image/png", "applicat
 export const IMAGE_TYPES: UploadMime[] = ["image/jpeg", "image/png"];
 
 export function uploadRoot() {
-  return path.resolve(process.env.UPLOAD_DIR || "./uploads");
+  // turbopackIgnore: a runtime path, so the build must not trace (and bundle) the whole project
+  if (process.env.VERCEL) throw new AppError("File storage is not set up: connect a Blob store to this Vercel project.");
+  return path.resolve(/* turbopackIgnore: true */ process.env.UPLOAD_DIR || "./uploads");
 }
 
 export type StoredFile = { fileName: string; filePath: string; mimeType: UploadMime; sizeBytes: number };
@@ -68,7 +70,7 @@ export async function saveUpload(file: File, folder: string, allowed: UploadMime
 /** Absolute path for a stored relative path; refuses anything outside UPLOAD_DIR. */
 export function resolveUpload(rel: string) {
   const root = uploadRoot();
-  const abs = path.resolve(root, rel);
+  const abs = path.resolve(/* turbopackIgnore: true */ root, rel);
   if (!abs.startsWith(root + path.sep)) throw new AppError("Invalid file path.");
   return abs;
 }
