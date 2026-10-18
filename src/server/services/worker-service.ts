@@ -107,12 +107,19 @@ export async function getWorkerProfile(actor: Actor, id: number, opts: { project
 
   const totalPaid = total._sum.amount ?? ZERO;
   const advanceTotal = advances._sum.amount ?? ZERO;
+  // Repaid through "Advance recovery" on the wage sheet (all projects)
+  const recovered = await db.payAdjustment.aggregate({
+    where: { workerId: id, type: "ADVANCE_RECOVERY", deletedAt: null },
+    _sum: { amount: true },
+  });
+  const advanceRecovered = recovered._sum.amount ?? ZERO;
   return {
     worker,
     totalPaid,
     paymentCount: total._count,
     advanceTotal,
     advanceCount: advances._count,
+    advanceRecovered,
     wagesPaid: totalPaid.minus(advanceTotal),
     pendingAmount: pending._sum.amount ?? ZERO,
     pendingCount: pending._count,

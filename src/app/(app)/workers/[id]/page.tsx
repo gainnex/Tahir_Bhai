@@ -111,7 +111,7 @@ export default async function WorkerProfilePage({ params, searchParams }: PagePr
           label="Advances given"
           icon={HandCoins}
           value={formatPKR(p.advanceTotal, cur)}
-          sub={`${plural(p.advanceCount, "advance")} · recovery tracking comes in Phase 2`}
+          sub={`${plural(p.advanceCount, "advance")} · ${formatPKR(p.advanceRecovered, cur)} recovered · ${formatPKR(p.advanceTotal.minus(p.advanceRecovered), cur)} outstanding`}
         />
         <Kpi
           label="Pending approval"
