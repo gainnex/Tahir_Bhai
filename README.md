@@ -30,11 +30,19 @@ The full specification is in [`docs/`](docs/README.md) (features, database, scre
   column. **Post wages** pays the selected balances in one go: one labour payment each ("Salaries" for
   monthly staff, "Daily wages" for daily-rate workers), charged to the employee's cost center
   (project / sub office / head office).
+- **Client billing**: running bills per client project (`BIL-YYYY-NNNNN`, with the client's own
+  reference) — claimed, then **verified** by the client at an approved amount (≤ claimed); **receipts**
+  (`RCT-YYYY-NNNNN`) against verified bills, with income tax deducted by the client. Printable bill and
+  receipt PDFs on the letterhead (amount in words, lakh / crore). Receivables on the dashboard and the
+  project page.
+- **Project profitability** report: contract value, claimed vs verified billing, received, receivable,
+  cost and margin (= verified billing − cost) per project, overheads (Head Office / sub offices)
+  separately and the net company result.
 - **Cash in hand** per employee: opening balance, funds given (cash / online transfer), cash
   returned, and expenses marked *Paid from* that employee. Running-balance statement per employee;
   an employee whose login is linked sees their own.
-- **Dashboard** and **6 reports** (Project Cost Summary, Expense Head, Project Ledger, Employee
-  Expenses, Vendors with GST/WHT, Tax report per payee with NTN) with Excel and PDF export (company name, address and logo on the PDF).
+- **Dashboard** and **7 reports** (Project Cost Summary, Expense Head, Project Ledger, Employee
+  Expenses, Vendors with GST/WHT, Tax report per payee with NTN, Project Profitability) with Excel and PDF export (company name, address and logo on the PDF).
 - **Users & roles**: Admin, Accountant, Site In-charge (sees and enters only for assigned projects).
 - **Activity log** of every create / edit / approve / reject / delete / login with old → new values.
 - Soft delete everywhere, exact decimal money (never floats), `PKR 1,250,000`, dates `DD-MM-YYYY`.
@@ -181,6 +189,10 @@ Other decisions made during the build:
 - Posting wages (`postWages`) recalculates every amount on the server and checks the whole batch
   first: anyone with nothing due, no cost center, a Completed cost center or a pending labour
   payment that month stops the batch, so nothing is paid twice. Cheques are entered one by one.
+- Billing (`billing-service.ts`, Admin / Accountant): receipts only on verified bills, dated on/after
+  the bill; received + tax deducted ≤ approved; the approved amount can't go below what is credited
+  and the claimed amount can't go below the approved; bills with receipts can't be deleted,
+  un-verified or moved to another project. Bills are for client projects, not Head Office / sub offices.
 - Taxes: `amount` stays the gross bill (the project's cost, used by every total); `gst_amount`
   and `wht_amount` are optional parts of it, each ≤ the amount (`expenses.ts` zod schemas).
 
@@ -223,6 +235,6 @@ tests/                     Vitest tests for the business rules
 
 ## Not in Phase 1
 
-Double-entry accounting, payroll posting / payslips, purchase orders / inventory, travel workflows,
-invoicing, tax filing / tax rates, bank reconciliation, mobile app, Urdu UI — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Double-entry accounting, payslips, purchase orders / inventory, travel workflows, retention money,
+tax filing / tax rates, bank reconciliation, mobile app, Urdu UI — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
 The data model (every expense has project + head + sub-head) is ready for those phases.

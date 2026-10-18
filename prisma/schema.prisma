@@ -81,6 +81,13 @@ enum PayAdjustmentType {
   ADVANCE_RECOVERY // repays an advance (advances themselves are expenses under "Advance to labour")
 }
 
+// Client bill (running bill / IPC): claimed by us, then verified by the client at an approved
+// amount (changes/changes.pdf §6, §7: "claim billing vs verified approved bill").
+enum ClientBillStatus {
+  CLAIMED
+  VERIFIED
+}
+
 enum PaymentMode {
   CASH
   ONLINE_TRANSFER
@@ -123,6 +130,8 @@ model User {
   cashEntries      CashEntry[]
   attendanceMarked Attendance[]
   payAdjustments   PayAdjustment[]
+  clientBills      ClientBill[]
+  clientReceipts   ClientReceipt[]
   expensesCreated  Expense[]     @relation("ExpenseCreatedBy")
   expensesApproved Expense[]     @relation("ExpenseApprovedBy")
   attachments      Attachment[]
@@ -154,6 +163,7 @@ model Project {
   expenses       Expense[]
   defaultWorkers Worker[]
   cashEntries    CashEntry[]
+  clientBills    ClientBill[]
 
   @@map("projects")
 }
@@ -362,6 +372,58 @@ model PayAdjustment {
 
   @@index([workerId, date])
   @@map("pay_adjustments")
+}
+
+// Receivables: what the client owes is approved - (received + tax the client deducted).
+model ClientBill {
+  id               Int              @id @default(autoincrement())
+  billNo           String           @unique @map("bill_no")
+  projectId        Int              @map("project_id")
+  date             DateTime         @db.Date
+  // The client's own reference, e.g. "RA Bill No. 3" / "IPC-03"
+  clientRef        String?          @map("client_ref")
+  description      String
+  claimedAmount    Decimal          @map("claimed_amount") @db.Decimal(14, 2)
+  status           ClientBillStatus @default(CLAIMED)
+  approvedAmount   Decimal?         @map("approved_amount") @db.Decimal(14, 2)
+  verifiedDate     DateTime?        @map("verified_date") @db.Date
+  verificationNote String?          @map("verification_note")
+  createdById      Int              @map("created_by")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  deletedAt        DateTime?        @map("deleted_at")
+
+  project   Project         @relation(fields: [projectId], references: [id])
+  createdBy User            @relation(fields: [createdById], references: [id])
+  receipts  ClientReceipt[]
+
+  @@index([projectId, date])
+  @@map("client_bills")
+}
+
+// Money received from the client against a verified bill.
+model ClientReceipt {
+  id          Int         @id @default(autoincrement())
+  receiptNo   String      @unique @map("receipt_no")
+  billId      Int         @map("bill_id")
+  date        DateTime    @db.Date
+  amount      Decimal     @db.Decimal(14, 2)
+  // Income tax the client withheld from this payment (credited against the bill)
+  taxDeducted Decimal?    @map("tax_deducted") @db.Decimal(14, 2)
+  paymentMode PaymentMode @map("payment_mode")
+  referenceNo String?     @map("reference_no")
+  notes       String?
+  createdById Int         @map("created_by")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  deletedAt   DateTime?   @map("deleted_at")
+
+  bill      ClientBill @relation(fields: [billId], references: [id])
+  createdBy User       @relation(fields: [createdById], references: [id])
+
+  @@index([billId])
+  @@index([date])
+  @@map("client_receipts")
 }
 
 model Attachment {

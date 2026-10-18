@@ -14,6 +14,8 @@ export const ENTITY_TYPES = [
   "cash_entry",
   "attendance",
   "pay_adjustment",
+  "client_bill",
+  "client_receipt",
   "user",
   "expense_head",
   "expense_subhead",
@@ -127,7 +129,7 @@ export async function listActivity(actor: Actor, f: ActivityFilters) {
 
   // Human labels for the records the rows point at (expense numbers, project codes, …)
   const idsOf = (type: string) => [...new Set(rows.filter((r) => r.entityType === type).map((r) => r.entityId))];
-  const [expenses, projects, vendors, workers, users, heads, subheads, cashEntries, adjustments] = await Promise.all([
+  const [expenses, projects, vendors, workers, users, heads, subheads, cashEntries, adjustments, bills, receipts] = await Promise.all([
     db.expense.findMany({ where: { id: { in: idsOf("expense") } }, select: { id: true, expenseNo: true } }),
     db.project.findMany({ where: { id: { in: idsOf("project") } }, select: { id: true, code: true } }),
     db.vendor.findMany({ where: { id: { in: idsOf("vendor") } }, select: { id: true, name: true } }),
@@ -138,6 +140,8 @@ export async function listActivity(actor: Actor, f: ActivityFilters) {
     db.expenseSubhead.findMany({ where: { id: { in: idsOf("expense_subhead") } }, select: { id: true, name: true } }),
     db.cashEntry.findMany({ where: { id: { in: idsOf("cash_entry") } }, select: { id: true, entryNo: true } }),
     db.payAdjustment.findMany({ where: { id: { in: idsOf("pay_adjustment") } }, select: { id: true, entryNo: true } }),
+    db.clientBill.findMany({ where: { id: { in: idsOf("client_bill") } }, select: { id: true, billNo: true } }),
+    db.clientReceipt.findMany({ where: { id: { in: idsOf("client_receipt") } }, select: { id: true, receiptNo: true } }),
   ]);
   const workerNames = Object.fromEntries(workers.map((w) => [w.id, w.name]));
   const labels: Record<string, Record<number, string>> = {
@@ -151,6 +155,8 @@ export async function listActivity(actor: Actor, f: ActivityFilters) {
     expense_subhead: Object.fromEntries(subheads.map((s) => [s.id, s.name])),
     cash_entry: Object.fromEntries(cashEntries.map((c) => [c.id, c.entryNo])),
     pay_adjustment: Object.fromEntries(adjustments.map((a) => [a.id, a.entryNo])),
+    client_bill: Object.fromEntries(bills.map((b) => [b.id, b.billNo])),
+    client_receipt: Object.fromEntries(receipts.map((r) => [r.id, r.receiptNo])),
   };
 
   const names = await namesForChanges(rows.map((r) => r.changes));
@@ -178,6 +184,10 @@ export function entityHref(entityType: string, entityId: number): string | null 
       return `/workers/${entityId}`;
     case "pay_adjustment":
       return `/payroll/adjustments/${entityId}/edit`;
+    case "client_bill":
+      return `/billing/${entityId}`;
+    case "client_receipt":
+      return `/billing/receipts/${entityId}/edit`;
     case "cash_entry":
       return `/cash/entry/${entityId}/edit`;
     case "user":

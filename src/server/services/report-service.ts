@@ -14,6 +14,7 @@ import {
 import { PAYMENT_MODE_LABELS, type ExpenseFilters } from "@/lib/validation/expenses";
 import { TRADE_LABELS, VENDOR_TYPE_LABELS } from "@/lib/validation/parties";
 import type { Actor } from "@/server/guards";
+import { profitabilityReport } from "./billing-service";
 import { expenseScope, listExpenses } from "./expense-service";
 import { assertProjectAccess } from "./project-service";
 
@@ -733,5 +734,7 @@ export async function buildReport(actor: Actor, slug: StandardReportSlug, f: Rep
       return vendorReport(actor, f);
     case "tax":
       return taxReport(actor, f);
+    case "profitability":
+      return profitabilityReport(actor, f);
   }
 }

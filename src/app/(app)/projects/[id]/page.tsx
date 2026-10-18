@@ -8,13 +8,14 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Notice } from "@/components/notice";
 import { OverBudgetBadge, ProjectStatusBadge } from "@/components/status-badges";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatAmount, formatDate, formatPKR, plural } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { requireUser } from "@/server/auth";
 import { pageData, parseId } from "@/server/params";
+import { projectBilling } from "@/server/services/billing-service";
 import { getProjectProfile } from "@/server/services/project-service";
 import { getSettings } from "@/server/services/settings-service";
 
@@ -28,6 +29,8 @@ export default async function ProjectProfilePage({ params }: PageProps<"/project
   const id = parseId((await params).id);
   const [p, settings] = await Promise.all([pageData(getProjectProfile(actor, id)), getSettings()]);
   const { project } = p;
+  const billing =
+    can.manageBilling(actor.role) && !project.isHeadOffice && !project.isSubOffice ? await projectBilling(project.id) : null;
   const cur = settings.currencyLabel;
   const locked = project.status === "COMPLETED";
   const over = p.usage?.level === "over";
@@ -119,6 +122,45 @@ export default async function ProjectProfilePage({ params }: PageProps<"/project
           sub={`${plural(p.pendingCount, "expense")} — not counted in totals yet`}
         />
       </div>
+
+      {billing && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Client billing</CardTitle>
+            <CardDescription>
+              Margin = verified billing − total spent ({plural(billing.count, "bill")})
+            </CardDescription>
+            <CardAction className="flex gap-2">
+              <Link href={`/billing?projectId=${project.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Bills
+              </Link>
+              <Link href={`/billing/new?projectId=${project.id}`} className={buttonVariants({ size: "sm" })}>
+                New bill
+              </Link>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-4 text-sm sm:grid-cols-3 lg:grid-cols-5">
+              {(
+                [
+                  ["Claimed", billing.claimed],
+                  ["Verified", billing.approved],
+                  ["Received", billing.credited],
+                  ["Receivable", billing.outstanding],
+                  ["Margin", billing.approved.minus(p.spent)],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-muted-foreground">{label}</dt>
+                  <dd className={cn("mt-1 font-mono text-base font-semibold tabular-nums", value.isNegative() && "text-destructive")}>
+                    {formatPKR(value, cur)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <Card>

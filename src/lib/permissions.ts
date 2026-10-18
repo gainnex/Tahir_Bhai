@@ -24,6 +24,8 @@ export const can = {
   manageWorkers: (r: Role) => PRIVILEGED.includes(r),
   /** Give / take back employees' cash in hand and see every employee's balance */
   manageCash: (r: Role) => PRIVILEGED.includes(r),
+  /** Client bills, verification, receipts, receivables and project profitability */
+  manageBilling: (r: Role) => PRIVILEGED.includes(r),
   /** Wage sheet, benefits / rewards / incentives / deductions */
   managePayroll: (r: Role) => PRIVILEGED.includes(r),
   /** Mark everyone's attendance; site in-charges only employees of their assigned projects */
@@ -43,6 +45,8 @@ export const ROUTE_ROLES: [prefix: string, roles: Role[]][] = [
   ["/cash/new", PRIVILEGED],
   ["/cash/entry", PRIVILEGED],
   ["/payroll", PRIVILEGED],
+  ["/billing", PRIVILEGED],
+  ["/reports/profitability", PRIVILEGED],
 ];
 
 export function isRouteAllowed(pathname: string, role: Role): boolean {

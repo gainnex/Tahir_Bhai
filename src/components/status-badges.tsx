@@ -1,5 +1,6 @@
 import { CheckCircle2, CircleDashed, Clock, PauseCircle, PlayCircle, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { BILL_PAYMENT_LABELS, type BillPaymentState } from "@/lib/validation/billing";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/lib/validation/projects";
 
 // Status → semantic Badge variant. Expense: Pending amber, Approved emerald, Rejected rose
@@ -52,6 +53,23 @@ export function OverBudgetBadge() {
   return (
     <Badge variant="danger">
       <XCircle /> Over budget
+    </Badge>
+  );
+}
+
+const BILL = {
+  AWAITING_VERIFICATION: { variant: "warning", Icon: Clock },
+  UNPAID: { variant: "danger", Icon: CircleDashed },
+  PART_PAID: { variant: "info", Icon: PauseCircle },
+  PAID: { variant: "success", Icon: CheckCircle2 },
+} as const;
+
+/** Client bill: awaiting verification / unpaid / part paid / paid. */
+export function BillStateBadge({ state }: { state: BillPaymentState }) {
+  const s = BILL[state];
+  return (
+    <Badge variant={s.variant}>
+      <s.Icon /> {BILL_PAYMENT_LABELS[state]}
     </Badge>
   );
 }

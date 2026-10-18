@@ -2,6 +2,7 @@ import {
   BarChart3,
   Building2,
   HardHat,
+  Landmark,
   LayoutDashboard,
   Receipt,
   Settings,
@@ -41,6 +42,15 @@ export const NAV: NavSection[] = [
   },
   { label: "Vendors", icon: Truck, href: "/vendors", roles: PRIVILEGED },
   {
+    label: "Client Billing",
+    icon: Landmark,
+    roles: PRIVILEGED,
+    children: [
+      { label: "Bills & Receipts", href: "/billing" },
+      { label: "New Bill", href: "/billing/new" },
+    ],
+  },
+  {
     label: "Reports",
     icon: BarChart3,
     children: [
@@ -50,6 +60,7 @@ export const NAV: NavSection[] = [
       { label: "Employee Expenses", href: "/reports/labour-payments" },
       { label: "Vendors", href: "/reports/vendors" },
       { label: "Tax (GST / WHT)", href: "/reports/tax" },
+      { label: "Project Profitability", href: "/reports/profitability", roles: PRIVILEGED },
     ],
   },
   {

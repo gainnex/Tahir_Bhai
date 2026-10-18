@@ -82,7 +82,7 @@ function TableBlock({ table }: { table: ReportTable }) {
   );
 }
 
-async function loadLogo(settings: AppSettings) {
+export async function loadLogo(settings: AppSettings) {
   if (!settings.logoPath) return null;
   try {
     const data = Buffer.from(await readUpload(settings.logoPath));

@@ -30,6 +30,8 @@ const ENTITY_LABEL: Record<EntityType, string> = {
   cash_entry: "Cash entry",
   attendance: "Attendance",
   pay_adjustment: "Pay adjustment",
+  client_bill: "Client bill",
+  client_receipt: "Client receipt",
   user: "User",
   expense_head: "Expense head",
   expense_subhead: "Sub-head",

@@ -43,6 +43,7 @@ export const REPORT_SLUGS = [
   "labour-payments",
   "vendors",
   "tax",
+  "profitability",
   "expenses",
   "wage-sheet",
 ] as const;
@@ -86,6 +87,12 @@ export const REPORTS: Record<
     description: "Total paid per vendor — pick a vendor to see the individual entries.",
     filters: ["project", "vendor"],
     defaultPeriod: "month",
+  },
+  profitability: {
+    title: "Project Profitability",
+    description: "Contract value, claimed vs verified billing, received, receivable, cost and margin per project.",
+    filters: ["project"],
+    defaultPeriod: "all",
   },
   tax: {
     title: "Tax Report",
