@@ -53,7 +53,7 @@ export const RENAMED_HEADS: { from: string; to: string; subheads?: Record<string
 ];
 
 export const DEFAULT_SETTINGS: Record<string, string> = {
-  company_name: "My Construction Company",
+  company_name: "LINECRAFT",
   company_address: "",
   logo_path: "",
   auto_approve_privileged: "true",
