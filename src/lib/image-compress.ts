@@ -1,11 +1,13 @@
 // Browser-only: shrink large phone photos before upload so receipts stay well under the
-// 5 MB limit on slow site connections. PDFs and small images are sent unchanged.
+// 5 MB limit on slow site connections, and turn other photo formats the phone may produce
+// (HEIC, WebP) into JPEG, which the server accepts. PDFs and small JPEG/PNGs are sent unchanged.
 
 const MAX_SIDE = 2000;
 const SKIP_BELOW = 1.5 * 1024 * 1024; // 1.5 MB
 
 export async function compressImage(file: File): Promise<File> {
-  if (!/^image\/(jpeg|png)$/.test(file.type) || file.size < SKIP_BELOW) return file;
+  const jpegOrPng = /^image\/(jpeg|png)$/.test(file.type);
+  if (!file.type.startsWith("image/") || (jpegOrPng && file.size < SKIP_BELOW)) return file;
   try {
     const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
     const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
@@ -19,8 +21,8 @@ export async function compressImage(file: File): Promise<File> {
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
     const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.82));
-    if (!blob || blob.size >= file.size) return file;
-    return new File([blob], file.name.replace(/\.(png|jpe?g)$/i, "") + ".jpg", { type: "image/jpeg" });
+    if (!blob || (jpegOrPng && blob.size >= file.size)) return file;
+    return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
   } catch {
     return file; // fall back to the original; the server still enforces the limit
   }

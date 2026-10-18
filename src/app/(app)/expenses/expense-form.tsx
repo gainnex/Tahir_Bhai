@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useFieldArray, useWatch } from "react-hook-form";
-import { CheckCircle2, FileText, ImageIcon, Plus, Split, Trash2, Upload } from "lucide-react";
+import { Camera, CheckCircle2, FileText, ImageIcon, Plus, Split, Trash2, Upload } from "lucide-react";
 import { ActionForm, ComboboxField, DateField, MoneyField, TextareaField, TextField } from "@/components/forms/fields";
 import { FormStatus } from "@/components/forms/form-status";
 import { useActionForm } from "@/components/forms/use-action-form";
@@ -112,6 +112,8 @@ export function ExpenseForm({ mode, action, options, values, attachments = [], d
   const [qty, setQty] = useState("");
   const [rate, setRate] = useState(startRate.replace(/\.00$/, ""));
   const [pickedFiles, setPickedFiles] = useState<File[]>([]);
+  const [photos, setPhotos] = useState<File[]>([]); // taken with the phone camera
+
 
   const schema = mode === "labour" ? labourPaymentSchema : split ? splitExpenseSchema : expenseSchema;
   const f = useActionForm<FormValues>(action, schema, {
@@ -580,11 +582,40 @@ export function ExpenseForm({ mode, action, options, values, attachments = [], d
               ))}
             </ul>
           )}
+          {/* Phones: open the camera straight away. Each photo is added to this input's file list
+              (DataTransfer), so several receipts can be snapped one after another. */}
+          <label className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-foreground active:opacity-90 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50 sm:hidden">
+            <Camera className="size-5" /> {photos.length ? "Take another photo" : "Take photo of receipt"}
+            <input
+              name="files"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              aria-label="Take photo of receipt"
+              onChange={(e) => {
+                const input = e.currentTarget;
+                const all = [...photos, ...Array.from(input.files ?? [])];
+                try {
+                  const dt = new DataTransfer();
+                  all.forEach((f) => dt.items.add(f));
+                  input.files = dt.files;
+                  setPhotos(all);
+                } catch {
+                  setPhotos(Array.from(input.files ?? [])); // old browsers: last photo only
+                }
+              }}
+              className="sr-only"
+            />
+          </label>
           {/* The real input covers the whole drop zone (invisible) so click and drag-and-drop both work. */}
           <div className="relative flex flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-border px-4 py-6 text-center transition-colors hover:border-primary/60 hover:bg-muted/40 has-[:focus-visible]:border-primary has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50">
             <Upload className="size-6 text-muted-foreground" />
             <p className="text-sm">
-              <span className="font-medium text-primary">Click to upload</span> or drag and drop
+              <span className="font-medium text-primary">
+                <span className="sm:hidden">Or choose a photo / PDF</span>
+                <span className="hidden sm:inline">Click to upload</span>
+              </span>
+              <span className="hidden sm:inline"> or drag and drop</span>
             </p>
             <p className="text-xs text-muted-foreground">JPG, PNG or PDF · up to 5 MB each</p>
             <input
@@ -597,6 +628,19 @@ export function ExpenseForm({ mode, action, options, values, attachments = [], d
               className="absolute inset-0 cursor-pointer opacity-0"
             />
           </div>
+          {photos.length > 0 && (
+            <ul className="space-y-1 text-sm">
+              {photos.map((x, i) => (
+                <li key={i} className="flex items-center gap-2 text-muted-foreground">
+                  <Camera className="size-4 shrink-0" />
+                  <span className="truncate">Photo {i + 1}</span>
+                  <span className="ml-auto font-mono text-xs tabular-nums">
+                    {x.size < 1024 * 1024 ? `${Math.ceil(x.size / 1024)} KB` : `${(x.size / 1024 / 1024).toFixed(1)} MB`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
           {pickedFiles.length > 0 && (
             <ul className="space-y-1 text-sm">
               {pickedFiles.map((x, i) => (

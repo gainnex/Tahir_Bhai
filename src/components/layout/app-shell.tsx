@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronsUpDown, HardHat, KeyRound, LogOut } from "lucide-react";
+import { ChevronsUpDown, HardHat, KeyRound, LogOut, Plus } from "lucide-react";
 import { logoutAction } from "@/app/login/actions";
+import { InstallAppMenuItem, IosInstallDialog } from "@/components/pwa";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -70,9 +71,27 @@ export function AppShell({ user, companyName, pendingCount, defaultOpen = true, 
           <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
           <span className="truncate text-sm font-medium">{companyName}</span>
         </header>
-        <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">{children}</div>
+        <div className="mx-auto w-full max-w-7xl p-4 pb-24 sm:p-6">{children}</div>
+        <QuickAddButton />
       </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+/** Phones: a floating "New expense" button, except on form pages (they have their own save bar). */
+function QuickAddButton() {
+  const pathname = usePathname();
+  if (/\/(new|edit|post)$/.test(pathname) || pathname.startsWith("/attendance") || pathname === "/labour-payment") {
+    return null;
+  }
+  return (
+    <Link
+      href="/expenses/new"
+      aria-label="New expense"
+      className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 active:scale-95 sm:hidden"
+    >
+      <Plus className="size-6" />
+    </Link>
   );
 }
 
@@ -154,8 +173,10 @@ function AppSidebar({ user, companyName, pendingCount }: Omit<Props, "children" 
 function UserMenu({ user, onNavigate }: { user: Props["user"]; onNavigate: () => void }) {
   const { isMobile } = useSidebar();
   const logoutForm = useRef<HTMLFormElement>(null);
+  const [iosHelp, setIosHelp] = useState(false);
   return (
     <SidebarMenu>
+      <IosInstallDialog open={iosHelp} onOpenChange={setIosHelp} />
       <SidebarMenuItem>
         {/* Sign-out form lives outside the menu portal; the menu item submits it. */}
         <form ref={logoutForm} action={logoutAction} className="hidden" />
@@ -195,6 +216,7 @@ function UserMenu({ user, onNavigate }: { user: Props["user"]; onNavigate: () =>
                 <KeyRound /> Change password
               </Link>
             </DropdownMenuItem>
+            <InstallAppMenuItem onIosHelp={() => setIosHelp(true)} />
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onSelect={() => logoutForm.current?.requestSubmit()}>
               <LogOut /> Sign out

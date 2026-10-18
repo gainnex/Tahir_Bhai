@@ -38,6 +38,11 @@ The full specification is in [`docs/`](docs/README.md) (features, database, scre
 - **Project profitability** report: contract value, claimed vs verified billing, received, receivable,
   cost and margin (= verified billing − cost) per project, overheads (Head Office / sub offices)
   separately and the net company result.
+- **Installable app for site staff** (PWA): add it to the phone's home screen (user menu → *Install
+  app* on Android / Chrome; *Share → Add to Home Screen* on iPhone). It opens full-screen with its own
+  icon, has a floating **+ New expense** button on phones, a **Take photo of receipt** button that
+  opens the camera (several photos per expense; HEIC/WebP photos are converted to JPEG) and a
+  friendly offline page. Nothing private is cached on the phone.
 - **Cash in hand** per employee: opening balance, funds given (cash / online transfer), cash
   returned, and expenses marked *Paid from* that employee. Running-balance statement per employee;
   an employee whose login is linked sees their own.
@@ -114,7 +119,10 @@ empty database; skip them with `SEED_SAMPLE_DATA=false npm run db:seed`.
 4. **Keep it running** with systemd or PM2 (e.g. `pm2 start npm --name pem -- start`) and put
    it behind Nginx/Caddy with HTTPS. Raise the proxy's upload limit to ~30 MB
    (Nginx: `client_max_body_size 30m;`) so several receipts can be sent at once.
-5. Log in as `admin`, change the password, then fill in **Settings → Company** (name, address,
+5. **HTTPS is required** for phones to install the app and for the service worker (`/sw.js`); on
+   plain `http://` everything else still works. Serve `/sw.js`, `/manifest.webmanifest` and
+   `/offline.html` without login (the proxy already does).
+6. Log in as `admin`, change the password, then fill in **Settings → Company** (name, address,
    logo) and create the real users.
 
 ### Deploying updates
@@ -236,5 +244,5 @@ tests/                     Vitest tests for the business rules
 ## Not in Phase 1
 
 Double-entry accounting, payslips, purchase orders / inventory, travel workflows, retention money,
-tax filing / tax rates, bank reconciliation, mobile app, Urdu UI — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
+tax filing / tax rates, bank reconciliation, native (app-store) mobile app, offline entry, Urdu UI — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
 The data model (every expense has project + head + sub-head) is ready for those phases.
