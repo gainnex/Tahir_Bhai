@@ -131,6 +131,7 @@ export default async function ProjectsPage({ searchParams }: PageProps<"/project
         rows={rows}
         currency={cur}
         canManage={canManage}
+        canInvoice={can.manageBilling(actor.role)}
         emptyText={q || status ? "No projects match these filters." : "No projects yet."}
         className="hidden sm:block"
       />

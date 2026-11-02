@@ -11,6 +11,25 @@ export const companySettingsSchema = z.object({
 });
 export type CompanySettingsInput = z.output<typeof companySettingsSchema>;
 
+/** Company details printed on project invoices (changes/invoice.xlsx). */
+export const invoiceSettingsSchema = z.object({
+  legalName: requiredText("Company legal name", 150),
+  ntn: optionalText(30),
+  salesTaxLabel: requiredText("Sales tax label", 60),
+  salesTaxRate: z
+    .string({ error: "Sales tax rate is required" })
+    .trim()
+    .regex(/^\d{1,2}(\.\d{1,2})?$/, "Enter a percentage such as 16 or 15.5"),
+  hsCode: optionalText(100),
+  bankAccountTitle: optionalText(150),
+  bankAccountNo: optionalText(50),
+  bankIban: optionalText(50),
+  bankDetails: optionalText(500),
+  signatory: optionalText(100),
+  signatoryTitle: optionalText(100),
+});
+export type InvoiceSettingsInput = z.output<typeof invoiceSettingsSchema>;
+
 // ---- Users ----
 
 const username = z

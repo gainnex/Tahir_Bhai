@@ -7,13 +7,14 @@ import {
   companySettingsSchema,
   createUserSchema,
   headNameSchema,
+  invoiceSettingsSchema,
   resetPasswordSchema,
   updateUserSchema,
 } from "@/lib/validation/settings";
 import { parseForm, runAction } from "@/server/action-utils";
 import { requireUser } from "@/server/auth";
 import * as heads from "@/server/services/head-service";
-import { updateCompanySettings } from "@/server/services/settings-service";
+import { updateCompanySettings, updateInvoiceSettings } from "@/server/services/settings-service";
 import * as users from "@/server/services/user-service";
 
 // Thin wrappers: authenticate, validate, call the service. Permission checks and
@@ -28,6 +29,16 @@ export async function saveCompanySettings(_prev: ActionState, fd: FormData): Pro
     await updateCompanySettings(actor, parsed.data, logo instanceof File ? logo : null);
     revalidatePath("/", "layout");
     return { ok: true, message: "Settings saved." };
+  });
+}
+
+export async function saveInvoiceSettings(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    const actor = await requireUser();
+    const parsed = parseForm(invoiceSettingsSchema, fd);
+    if (!parsed.ok) return parsed.state;
+    await updateInvoiceSettings(actor, parsed.data);
+    return { ok: true, message: "Invoice details saved." };
   });
 }
 

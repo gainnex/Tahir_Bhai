@@ -3,9 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Prisma, bcrypt and the PDF/Excel libraries run only on the server.
   serverExternalPackages: ["@prisma/client", "@react-pdf/renderer", "exceljs"],
-  // The bundled company logo is read by the PDF exports (public/ is not in server bundles on Vercel)
+  // The bundled logo / letterhead are read by the PDF and invoice exports (public/ is not in server bundles on Vercel)
   outputFileTracingIncludes: {
-    "/api/**": ["./public/brand/logo.png"],
+    "/api/**": ["./public/brand/logo.png", "./public/brand/letterhead.png"],
   },
   // The service worker must never be cached, so phones pick up a new version straight away.
   async headers() {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Eye, Pencil, Plus } from "lucide-react";
+import { Eye, FileSpreadsheet, Pencil, Plus } from "lucide-react";
 import { BudgetBar } from "@/components/budget-bar";
 import { SortHeader } from "@/components/data-table/column-header";
 import { DataTable } from "@/components/data-table/data-table";
@@ -32,12 +32,15 @@ export function ProjectsTable({
   rows,
   currency,
   canManage,
+  canInvoice,
   emptyText,
   className,
 }: {
   rows: ProjectListRow[];
   currency: string;
   canManage: boolean;
+  /** Admin / Accountant: "Create invoice" on client projects */
+  canInvoice: boolean;
   emptyText: string;
   className?: string;
 }) {
@@ -108,6 +111,8 @@ export function ProjectsTable({
         const p = row.original;
         const actions: RowAction[] = [{ label: "View", icon: Eye, href: `/projects/${p.id}` }];
         if (canManage) actions.push({ label: "Edit", icon: Pencil, href: `/projects/${p.id}/edit` });
+        if (canInvoice && !p.kind)
+          actions.push({ label: "Create invoice", icon: FileSpreadsheet, href: `/projects/${p.id}/invoice` });
         // Completed projects are locked: no new expenses (same rule as the profile page)
         if (p.status !== "COMPLETED")
           actions.push({ label: "New expense", icon: Plus, href: `/expenses/new?projectId=${p.id}` });

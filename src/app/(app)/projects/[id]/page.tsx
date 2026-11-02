@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, CircleDollarSign, Clock, Pencil, Plus, Users, Wallet } from "lucide-react";
+import { BookOpen, CircleDollarSign, Clock, FileSpreadsheet, Pencil, Plus, Users, Wallet } from "lucide-react";
 import { BudgetBar } from "@/components/budget-bar";
 import { AmountBarChart } from "@/components/charts/amount-bar-chart";
 import { ExpenseMiniTable } from "@/components/expense-mini-table";
@@ -53,6 +53,8 @@ export default async function ProjectProfilePage({ params }: PageProps<"/project
           <>
             <span className="font-mono">{project.code}</span>
             {[project.clientName, project.location].filter(Boolean).map((t) => ` · ${t}`)}
+            {project.clientNtn && ` · NTN ${project.clientNtn}`}
+            {project.workOrderNo && ` · WO ${project.workOrderNo}`}
             {project.projectManager && ` · PM: ${project.projectManager}`}
             {" · Started "}
             <span className="font-mono tabular-nums">{formatDate(project.startDate)}</span>
@@ -74,6 +76,11 @@ export default async function ProjectProfilePage({ params }: PageProps<"/project
             <Link href={`/reports/project-ledger?projectId=${project.id}`} className={buttonVariants({ variant: "outline" })}>
               <BookOpen /> View ledger
             </Link>
+            {billing && (
+              <Link href={`/projects/${project.id}/invoice`} className={buttonVariants({ variant: "outline" })}>
+                <FileSpreadsheet /> Create invoice
+              </Link>
+            )}
             {can.manageProjects(actor.role) && (
               <Link href={`/projects/${project.id}/edit`} className={buttonVariants({ variant: "outline" })}>
                 <Pencil /> Edit

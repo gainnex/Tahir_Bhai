@@ -58,4 +58,16 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   logo_path: "",
   auto_approve_privileged: "true",
   currency_label: "PKR",
+  // Invoice (changes/invoice.xlsx)
+  company_legal_name: "Line Craft (Pvt.) Ltd.",
+  company_ntn: "2839032-6",
+  sales_tax_label: "Sales Tax (PRA)",
+  sales_tax_rate: "16",
+  invoice_hs_code: "9824.0000- - - CONSTRUCTION SERVICES",
+  bank_account_title: "Line Craft (Pvt.) Ltd.",
+  bank_account_no: "0201139501820001",
+  bank_iban: "PK89BKIP0201139501820001",
+  bank_details: "BankIslami Pakistan Ltd.\nAkbar Chowk, Peco Road Branch Lahore\nBranch Code 2011",
+  invoice_signatory: "KAMRAN NADEEM",
+  invoice_signatory_title: "Accounts",
 };

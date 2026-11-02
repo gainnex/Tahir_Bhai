@@ -35,6 +35,11 @@ The full specification is in [`docs/`](docs/README.md) (features, database, scre
   (`RCT-YYYY-NNNNN`) against verified bills, with income tax deducted by the client. Printable bill and
   receipt PDFs on the letterhead (amount in words, lakh / crore). Receivables on the dashboard and the
   project page.
+- **Auto invoice** per client project (project page → *Create invoice*, Admin / Accountant): an Excel file
+  in the client's own layout (`changes/invoice.xlsx`) — an invoice with bank details and a sales tax invoice
+  with "Bill to". The client name, NTN, billing address and work order no. / amount come from the project;
+  the company NTN, sales tax rate, bank details and signatory from Settings → Company. Enter the bill %
+  (pre-filled: next invoice no. and "FIRST / SECOND … RUNNING BILL"); amounts are Excel formulas.
 - **Project profitability** report: contract value, claimed vs verified billing, received, receivable,
   cost and margin (= verified billing − cost) per project, overheads (Head Office / sub offices)
   separately and the net company result.

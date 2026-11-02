@@ -22,6 +22,10 @@ export type ProjectFormValues = {
   code: string;
   name: string;
   clientName: string;
+  clientNtn: string;
+  clientAddress: string;
+  workOrderNo: string;
+  workOrderAmount: string;
   projectManager: string;
   location: string;
   startDate: string; // YYYY-MM-DD
@@ -39,6 +43,10 @@ type FormValues = {
   code: string;
   name: string;
   clientName: string;
+  clientNtn: string;
+  clientAddress: string;
+  workOrderNo: string;
+  workOrderAmount: string;
   projectManager: string;
   location: string;
   startDate: string;
@@ -65,6 +73,10 @@ export function ProjectForm({ action, deleteAction, values, siteIncharges, cance
       code: values?.code ?? "",
       name: values?.name ?? "",
       clientName: values?.clientName ?? "",
+      clientNtn: values?.clientNtn ?? "",
+      clientAddress: values?.clientAddress ?? "",
+      workOrderNo: values?.workOrderNo ?? "",
+      workOrderAmount: values?.workOrderAmount ?? "",
       projectManager: values?.projectManager ?? "",
       location: values?.location ?? "",
       startDate: values?.startDate ?? "",
@@ -123,6 +135,32 @@ export function ProjectForm({ action, deleteAction, values, siteIncharges, cance
           )}
         </CardContent>
       </Card>
+
+      {!isHeadOffice && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Client &amp; work order</CardTitle>
+            <CardDescription>Optional. Filled in automatically on invoices created for this project.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <TextField name="clientNtn" label="Client NTN" inputClassName="font-mono" />
+            <TextField name="workOrderNo" label="Work order no." inputClassName="font-mono" />
+            <MoneyField
+              name="workOrderAmount"
+              label="Work order amount (PKR)"
+              description="Including sales tax"
+              placeholder="e.g. 12369081"
+            />
+            <TextareaField
+              name="clientAddress"
+              label="Client billing address"
+              rows={4}
+              className="sm:col-span-2"
+              description="Printed under “Bill to” on the tax invoice, one line per line"
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { DEFAULT_SETTINGS } from "@/lib/defaults";
-import type { CompanySettingsInput } from "@/lib/validation/settings";
+import type { CompanySettingsInput, InvoiceSettingsInput } from "@/lib/validation/settings";
 import { assertCan, type Actor } from "@/server/guards";
 import { IMAGE_TYPES, saveUpload } from "@/server/storage";
 import { logActivity } from "./activity-log";
@@ -11,6 +11,38 @@ export type AppSettings = {
   logoPath: string;
   autoApprovePrivileged: boolean;
   currencyLabel: string;
+  invoice: InvoiceSettings;
+};
+
+/** Company details printed on project invoices (changes/invoice.xlsx). */
+export type InvoiceSettings = {
+  legalName: string;
+  ntn: string;
+  salesTaxLabel: string;
+  /** Percent, e.g. "16" */
+  salesTaxRate: string;
+  hsCode: string;
+  bankAccountTitle: string;
+  bankAccountNo: string;
+  bankIban: string;
+  /** Bank name, branch and branch code, one per line */
+  bankDetails: string;
+  signatory: string;
+  signatoryTitle: string;
+};
+
+const INVOICE_KEYS: Record<keyof InvoiceSettings, string> = {
+  legalName: "company_legal_name",
+  ntn: "company_ntn",
+  salesTaxLabel: "sales_tax_label",
+  salesTaxRate: "sales_tax_rate",
+  hsCode: "invoice_hs_code",
+  bankAccountTitle: "bank_account_title",
+  bankAccountNo: "bank_account_no",
+  bankIban: "bank_iban",
+  bankDetails: "bank_details",
+  signatory: "invoice_signatory",
+  signatoryTitle: "invoice_signatory_title",
 };
 
 /** All settings with defaults filled in for any missing key. */
@@ -23,6 +55,9 @@ export async function getSettings(): Promise<AppSettings> {
     logoPath: map.logo_path,
     autoApprovePrivileged: map.auto_approve_privileged === "true",
     currencyLabel: map.currency_label || "PKR",
+    invoice: Object.fromEntries(
+      Object.entries(INVOICE_KEYS).map(([field, key]) => [field, map[key] ?? ""]),
+    ) as InvoiceSettings,
   };
 }
 
@@ -51,6 +86,24 @@ export async function updateCompanySettings(actor: Actor, input: CompanySettings
     currency_label: before.currencyLabel,
   };
 
+  await saveChanged(actor, prev, next);
+}
+
+/** Update the company details printed on project invoices. */
+export async function updateInvoiceSettings(actor: Actor, input: InvoiceSettingsInput) {
+  assertCan(actor, "manageSettings");
+  const before = (await getSettings()).invoice;
+  const prev: Record<string, string> = {};
+  const next: Record<string, string> = {};
+  for (const [field, key] of Object.entries(INVOICE_KEYS) as [keyof InvoiceSettings, string][]) {
+    prev[key] = before[field];
+    next[key] = input[field] ?? "";
+  }
+  await saveChanged(actor, prev, next);
+}
+
+/** Upserts the keys whose value changed and logs them as one settings UPDATE. */
+async function saveChanged(actor: Actor, prev: Record<string, string>, next: Record<string, string>) {
   const changes: Record<string, { old: string; new: string }> = {};
   for (const key of Object.keys(next)) {
     if (next[key] !== prev[key]) changes[key] = { old: prev[key], new: next[key] };

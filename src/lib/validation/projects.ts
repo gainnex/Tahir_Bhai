@@ -26,6 +26,11 @@ export const projectSchema = z
       .regex(/^[A-Z0-9][A-Z0-9-]*$/, "Use letters, numbers and dashes only, e.g. PRJ-001"),
     name: requiredText("Name", 150),
     clientName: optionalText(150),
+    /** Invoice details (changes/invoice.xlsx) */
+    clientNtn: optionalText(30),
+    clientAddress: optionalText(500),
+    workOrderNo: optionalText(60),
+    workOrderAmount: optionalMoney("Work order amount"),
     projectManager: optionalText(150),
     location: optionalText(150),
     startDate: dateField("Start date"),
@@ -41,4 +46,7 @@ export const projectSchema = z
     message: "End date cannot be before the start date",
     path: ["endDate"],
   });
-export type ProjectInput = z.output<typeof projectSchema>;
+type InvoiceDetailKey = "clientNtn" | "clientAddress" | "workOrderNo" | "workOrderAmount";
+/** The invoice details are optional for callers other than the form (missing = none). */
+export type ProjectInput = Omit<z.output<typeof projectSchema>, InvoiceDetailKey> &
+  Partial<Pick<z.output<typeof projectSchema>, InvoiceDetailKey>>;
